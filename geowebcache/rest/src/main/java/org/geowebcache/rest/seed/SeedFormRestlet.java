@@ -45,6 +45,7 @@ import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.GWCTask.TYPE;
 import org.geowebcache.seed.SeedRequest;
+import org.geowebcache.seed.ThreadedTileBreeder;
 import org.geowebcache.seed.TileBreeder;
 import org.geowebcache.storage.TileRange;
 import org.geowebcache.util.ServletUtils;
@@ -756,7 +757,7 @@ public class SeedFormRestlet extends GWCRestlet {
         SeedRequest sr = new SeedRequest(layerName, bounds, gridSetId, threadCount, zoomStart,
                 zoomStop, format, type, fullParameters);
 
-        TileRange tr = TileBreeder.createTileRange(sr, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(sr, tl);
 
         GWCTask[] tasks;
         try {

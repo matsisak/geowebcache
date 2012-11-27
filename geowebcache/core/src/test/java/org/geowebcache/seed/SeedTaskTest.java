@@ -121,7 +121,7 @@ public class SeedTaskTest extends TestCase {
         final int zoomLevel = 4;
         SeedRequest req = createRequest(tl, TYPE.SEED, zoomLevel, zoomLevel);
 
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
         /*
@@ -199,7 +199,7 @@ public class SeedTaskTest extends TestCase {
         final int zoomLevel = 4;
         SeedRequest req = createRequest(tl, TYPE.SEED, zoomLevel, zoomLevel);
 
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
         /*
@@ -276,7 +276,7 @@ public class SeedTaskTest extends TestCase {
         expect(mockStorageBroker.get((TileObject) anyObject())).andReturn(false).anyTimes();
         replay(mockStorageBroker);
 
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
         boolean reseed = false;

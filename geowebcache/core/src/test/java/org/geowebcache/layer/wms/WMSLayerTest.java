@@ -50,7 +50,7 @@ import org.geowebcache.io.Resource;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.SeedRequest;
-import org.geowebcache.seed.TileBreeder;
+import org.geowebcache.seed.ThreadedTileBreeder;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
 import org.geowebcache.storage.TileRange;
@@ -125,7 +125,7 @@ public class WMSLayerTest extends TestCase {
         MockTileSupport mock = new MockTileSupport(tl);
 
         SeedRequest req = createRequest(tl, GWCTask.TYPE.SEED, 4, 7);
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         
         seedTiles(mock.storageBroker, tr, tl);
         
@@ -145,7 +145,7 @@ public class WMSLayerTest extends TestCase {
 
         // we're not really seeding, just using the range
         SeedRequest req = createRequest(tl, GWCTask.TYPE.SEED, 4, 7);
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
 
         List<ConveyorTile> tiles = getTiles(mock.storageBroker, tr, tl);
 
