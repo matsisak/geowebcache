@@ -50,7 +50,7 @@ import org.geowebcache.io.Resource;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.SeedRequest;
-import org.geowebcache.seed.ThreadedTileBreeder;
+import org.geowebcache.seed.threaded.ThreadedTileBreeder;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
 import org.geowebcache.storage.TileRange;

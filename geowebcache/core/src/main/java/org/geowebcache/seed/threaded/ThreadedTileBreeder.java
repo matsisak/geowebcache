@@ -17,7 +17,7 @@
  * @author Gabriel Roldan / OpenGeo 2010  
  * @author Kevin Smith / OpenGeo 2012
  */
-package org.geowebcache.seed;
+package org.geowebcache.seed.threaded;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.geowebcache.GeoWebCacheException;
@@ -47,6 +48,13 @@ import org.geowebcache.layer.TileLayer;
 import org.geowebcache.layer.TileLayerDispatcher;
 import org.geowebcache.mime.MimeException;
 import org.geowebcache.mime.MimeType;
+import org.geowebcache.seed.GWCTask;
+import org.geowebcache.seed.Job;
+import org.geowebcache.seed.JobStatus;
+import org.geowebcache.seed.SeedRequest;
+import org.geowebcache.seed.SeederThreadPoolExecutor;
+import org.geowebcache.seed.TaskStatus;
+import org.geowebcache.seed.TileBreeder;
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.GWCTask.TYPE;
 import org.geowebcache.storage.StorageBroker;
@@ -57,6 +65,7 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.util.Assert;
 
 /**
  * Class in charge of dispatching seed/truncate tasks.
@@ -100,7 +109,7 @@ import org.springframework.context.ApplicationContextAware;
  * 
  * @author Gabriel Roldan, based on Marius Suta's and Arne Kepp's SeedRestlet
  */
-public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware {
+public class ThreadedTileBreeder extends TileBreeder implements ApplicationContextAware {
     private static final String GWC_SEED_ABORT_LIMIT = "GWC_SEED_ABORT_LIMIT";
 
     private static final String GWC_SEED_RETRY_WAIT = "GWC_SEED_RETRY_WAIT";
@@ -133,7 +142,8 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
 
     private Map<Long, SubmittedTask> currentPool = new TreeMap<Long, SubmittedTask>();
 
-    private AtomicLong currentId = new AtomicLong();
+    private AtomicLong currentTaskId = new AtomicLong();
+    private AtomicLong currentJobId = new AtomicLong();
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -148,6 +158,8 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
         }
     }
 
+    private Collection<ThreadedJob> jobs;
+    
     /**
      * Initializes the seed task failure control variables either with the provided environment
      * variable values or their defaults.
@@ -206,14 +218,14 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
 
         TileRange tr = createTileRange(sr, tl);
 
-        GWCTask[] tasks = createTasks(tr, tl, sr.getType(), sr.getThreadCount(),
+        Job job = createJob(tr, tl, sr.getType(), sr.getThreadCount(),
                 sr.getFilterUpdate());
 
-        dispatchTasks(tasks);
+        dispatchJob(job);
     }
 
     /**
-     * Create tasks to manipulate the cache (Seed, truncate, etc)  They will still need to be dispatched.
+     * Create a job manipulate the cache (Seed, truncate, etc)  It will still need to be dispatched.
      * 
      * @param tr The range of tiles to work on.
      * @param type The type of task(s) to create
@@ -222,16 +234,16 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
      * @return Array of tasks.  Will have length threadCount or 1.
      * @throws GeoWebCacheException
      */
-    public GWCTask[] createTasks(TileRange tr, GWCTask.TYPE type, int threadCount,
+    public Job createJob(TileRange tr, GWCTask.TYPE type, int threadCount,
             boolean filterUpdate) throws GeoWebCacheException {
 
         String layerName = tr.getLayerName();
         TileLayer tileLayer = layerDispatcher.getTileLayer(layerName);
-        return createTasks(tr, tileLayer, type, threadCount, filterUpdate);
+        return createJob(tr, tileLayer, type, threadCount, filterUpdate);
     }
 
     /**
-     * Create tasks to manipulate the cache (Seed, truncate, etc).  They will still need to be dispatched.
+     * Create a job to manipulate the cache (Seed, truncate, etc).  In will still need to be dispatched.
      * 
      * @param tr The range of tiles to work on.
      * @param tl The layer to work on.  Overrides any layer specified on tr.
@@ -241,48 +253,50 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
      * @return Array of tasks.  Will have length threadCount or 1.
      * @throws GeoWebCacheException
      */
-    public GWCTask[] createTasks(TileRange tr, TileLayer tl, GWCTask.TYPE type, int threadCount,
+    public Job createJob(TileRange tr, TileLayer tl, GWCTask.TYPE type, int threadCount,
             boolean filterUpdate) throws GeoWebCacheException {
 
         if (type == GWCTask.TYPE.TRUNCATE || threadCount < 1) {
             log.trace("Forcing thread count to 1");
             threadCount = 1;
         }
-
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
-
-        GWCTask[] tasks = new GWCTask[threadCount];
-
-        AtomicLong failureCounter = new AtomicLong();
-        AtomicInteger sharedThreadCount = new AtomicInteger();
-        for (int i = 0; i < threadCount; i++) {
-            if (type == TYPE.TRUNCATE) {
-                tasks[i] = createTruncateTask(trIter, tl, filterUpdate);
-            } else {
-                SeedTask task = (SeedTask) createSeedTask(type, trIter, tl, filterUpdate);
-                task.setFailurePolicy(tileFailureRetryCount, tileFailureRetryWaitTime,
-                        totalFailuresBeforeAborting, failureCounter);
-                tasks[i] = task;
-            }
-            tasks[i].setThreadInfo(sharedThreadCount, i);
+        ThreadedJob job;
+        switch (type) {
+        case TRUNCATE:
+            throw new UnsupportedOperationException(); // TODO
+        case SEED:
+            job = new ThreadedSeedJob(currentJobId.getAndIncrement(), threadCount,
+                    this, false, trIter, tl, tileFailureRetryCount, tileFailureRetryWaitTime,
+                    totalFailuresBeforeAborting,filterUpdate);
+            break;
+        case RESEED:
+            job = new ThreadedSeedJob(currentJobId.getAndIncrement(), threadCount,
+                    this, true, trIter, tl, tileFailureRetryCount, tileFailureRetryWaitTime,
+                    totalFailuresBeforeAborting,filterUpdate);
+            break;
+        default:
+            throw new IllegalArgumentException("Only SEED, RESEED, and TRUNCATE job types can be created.");
         }
-
-        return tasks;
+        jobs.add(job);
+        return job;
     }
 
     /**
      * Dispatches tasks 
      * 
-     * @param tasks
+     * @param job
      */
-    public void dispatchTasks(GWCTask[] tasks) {
+    public void dispatchJob(Job job) {
+        Assert.isTrue(job.getBreeder()==this, "Job was not created by this breeder.");
         lock.writeLock().lock();
         try {
+            GWCTask[] tasks = job.getTasks();
             for (int i = 0; i < tasks.length; i++) {
-                final Long taskId = this.currentId.incrementAndGet();
+                final Long taskId = this.currentTaskId.incrementAndGet();
                 final GWCTask task = tasks[i];
                 task.setTaskId(taskId);
-                Future<GWCTask> future = threadPool.submit(new MTSeeder(task));
+                Future<GWCTask> future = threadPool.submit(wrapTask(task));
                 this.currentPool.put(taskId, new SubmittedTask(task, future));
             }
         } finally {
@@ -359,34 +373,6 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
     }
 
     /**
-     * Create a Seed/Reseed task.
-     * @param type the type, SEED or RESEED
-     * @param trIter a collection of tile ranges
-     * @param tl the layer
-     * @param doFilterUpdate 
-     * @return
-     * @throws IllegalArgumentException
-     */
-    private GWCTask createSeedTask(TYPE type, TileRangeIterator trIter, TileLayer tl,
-            boolean doFilterUpdate) throws IllegalArgumentException {
-
-        switch (type) {
-        case SEED:
-            return new SeedTask(storageBroker, trIter, tl, false, doFilterUpdate);
-        case RESEED:
-            return new SeedTask(storageBroker, trIter, tl, true, doFilterUpdate);
-        default:
-            throw new IllegalArgumentException("Unknown request type " + type);
-        }
-    }
-
-    private GWCTask createTruncateTask(TileRangeIterator trIter, TileLayer tl,
-            boolean doFilterUpdate) {
-
-        return new TruncateTask(storageBroker, trIter.getTileRange(), tl, doFilterUpdate);
-    }
-
-    /**
      * Method returns List of Strings representing the status of the currently running and scheduled
      * threads
      * 
@@ -396,6 +382,50 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
      */
     public long[][] getStatusList() {
         return getStatusList(null);
+    }
+    
+    
+    public Collection<TaskStatus> getTaskStatusList(String layerName){
+        List<TaskStatus> list = new ArrayList<TaskStatus>(currentPool.size());
+        lock.readLock().lock();
+        try {
+            for (Entry<Long, SubmittedTask> entry: currentPool.entrySet()) {
+                GWCTask task = entry.getValue().task;
+                if (layerName != null && !layerName.equals(task.getLayerName())) {
+                    continue;
+                }
+                list.add( task.getStatus());
+            }
+        } finally {
+            lock.readLock().unlock();
+            this.drain();
+        }
+        return list;
+    }
+
+    public Collection<JobStatus> getJobStatusList() {
+        return getJobStatusList(null);
+    }
+
+    public Collection<JobStatus> getJobStatusList(String layerName) {
+        List<JobStatus> list = new ArrayList<JobStatus>(jobs.size());
+        lock.readLock().lock();
+        try {
+            for (ThreadedJob job: jobs) {
+                if (layerName != null && !layerName.equals(job.getLayer().getName())) {
+                    continue;
+                }
+                list.add(job.getStatus());
+            }
+        } finally {
+            lock.readLock().unlock();
+            this.drain();
+        }
+        return list;
+    }
+
+    public Collection<TaskStatus> getTaskStatusList() {
+        return getTaskStatusList(null);
     }
 
     /**
@@ -579,4 +609,12 @@ public class ThreadedTileBreeder implements TileBreeder, ApplicationContextAware
         return this.layerDispatcher.getLayerList();
     }
 
+    long getNextTaskId() {
+        return currentTaskId.getAndIncrement();
+    }
+    
+    // Make visible to package.
+    protected void setTaskState(GWCTask task, GWCTask.STATE state) {
+        super.setTaskState(task, state);
+    }
 }

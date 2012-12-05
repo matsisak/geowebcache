@@ -14,16 +14,15 @@
  * 
  * @author Gabriel Roldan, OpenGeo, Copyright 2010
  */
-package org.geowebcache.seed;
+package org.geowebcache.seed.threaded;
 
-import static org.easymock.EasyMock.anyObject;
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.classextension.EasyMock.replay;
+import static org.easymock.classextension.EasyMock.*;
 
 import static org.geowebcache.TestHelpers.createFakeSourceImage;
 import static org.geowebcache.TestHelpers.createWMSLayer;
 import static org.geowebcache.TestHelpers.createRequest;
+
+import static org.geowebcache.storage.TileObjectMatcher.tileObjectAt;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -45,11 +44,16 @@ import org.geowebcache.TestHelpers;
 import org.geowebcache.grid.BoundingBox;
 import org.geowebcache.grid.GridSubset;
 import org.geowebcache.io.Resource;
+import org.geowebcache.layer.TileLayer;
 import org.geowebcache.layer.TileResponseReceiver;
 import org.geowebcache.layer.wms.WMSLayer;
 import org.geowebcache.layer.wms.WMSMetaTile;
 import org.geowebcache.layer.wms.WMSSourceHelper;
+import org.geowebcache.seed.SeedRequest;
+import org.geowebcache.seed.SeedTask;
 import org.geowebcache.seed.GWCTask.TYPE;
+import org.geowebcache.seed.threaded.ThreadedSeedJob;
+import org.geowebcache.seed.threaded.ThreadedTileBreeder;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
 import org.geowebcache.storage.TileRange;
@@ -62,16 +66,33 @@ import org.geowebcache.util.MockWMSSourceHelper;
  * @author Gabriel Roldan (OpenGeo)
  * @version $Id$
  */
-public class SeedTaskTest extends TestCase {
+public class ThreadedSeedJobTest extends TestCase {
 
+    ThreadedTileBreeder breeder;
+    StorageBroker storageBroker;
+    WMSLayer tl;
+    byte[] fakeWMSResponse;
+    
     protected void setUp() throws Exception {
         super.setUp();
+        
+        storageBroker = EasyMock.createMock(StorageBroker.class);
+        expect(storageBroker.put((TileObject) anyObject())).andReturn(true).anyTimes();
+        expect(storageBroker.get((TileObject) anyObject())).andReturn(false).anyTimes();
+        replay(storageBroker);
+
+        breeder = EasyMock.createMock(ThreadedTileBreeder.class);
+        expect(breeder.getStorageBroker()).andReturn(storageBroker).anyTimes();
+        replay(breeder);
+
+        tl = createWMSLayer("image/png");
+        fakeWMSResponse = createFakeSourceImage(tl);
     }
 
     protected void tearDown() throws Exception {
         super.tearDown();
     }
-
+    
     /**
      * For a metatiled seed request over a given zoom level, make sure the correct wms calls are
      * issued
@@ -80,24 +101,11 @@ public class SeedTaskTest extends TestCase {
      */
     @SuppressWarnings("serial")
     public void testSeedWMSRequests() throws Exception {
-        WMSLayer tl = createWMSLayer("image/png");
-
-        // create an image to be returned by the mock WMSSourceHelper
-        final byte[] fakeWMSResponse = createFakeSourceImage(tl);
 
         // WMSSourceHelper that on makeRequest() returns always the saqme fake image
         WMSSourceHelper mockSourceHelper = EasyMock.createMock(WMSSourceHelper.class);
 
-        final AtomicInteger wmsRequestsCounter = new AtomicInteger();
-        Capture<WMSMetaTile> wmsRequestsCapturer = new Capture<WMSMetaTile>() {
-            /**
-             * Override because setValue with anyTimes() resets the list of values
-             */
-            @Override
-            public void setValue(WMSMetaTile o) {
-                wmsRequestsCounter.incrementAndGet();
-            }
-        };
+
         Capture<Resource> resourceCapturer = new Capture<Resource>() {
             @Override
             public void setValue(Resource target) {
@@ -109,11 +117,11 @@ public class SeedTaskTest extends TestCase {
                 }
             }
         };
-        mockSourceHelper.makeRequest(capture(wmsRequestsCapturer), capture(resourceCapturer));
-        mockSourceHelper.makeRequest(capture(wmsRequestsCapturer), capture(resourceCapturer));
-        mockSourceHelper.makeRequest(capture(wmsRequestsCapturer), capture(resourceCapturer));
+        mockSourceHelper.makeRequest(EasyMock.<WMSMetaTile> anyObject(), capture(resourceCapturer));
+        expectLastCall().times(3);
+        
         mockSourceHelper.setConcurrency(32);
-        mockSourceHelper.setBackendTimeout(120);    
+        mockSourceHelper.setBackendTimeout(120);
         replay(mockSourceHelper);
 
         tl.setSourceHelper(mockSourceHelper);
@@ -124,16 +132,11 @@ public class SeedTaskTest extends TestCase {
         TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
-        /*
-         * Create a mock storage broker that does nothing
-         */
-        final StorageBroker mockStorageBroker = EasyMock.createMock(StorageBroker.class);
-        expect(mockStorageBroker.put((TileObject) anyObject())).andReturn(true).anyTimes();
-        expect(mockStorageBroker.get((TileObject) anyObject())).andReturn(false).anyTimes();
-        replay(mockStorageBroker);
-
         boolean reseed = false;
-        SeedTask seedTask = new SeedTask(mockStorageBroker, trIter, tl, reseed, false);
+        
+        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, reseed, trIter, tl, 1,1,4, false);
+        SeedTask seedTask = (SeedTask) job.getTasks()[0];
+        
         seedTask.setTaskId(1L);
         seedTask.setThreadInfo(new AtomicInteger(), 0);
         /*
@@ -146,9 +149,7 @@ public class SeedTaskTest extends TestCase {
          */
         seedTask.doAction();
 
-        final long expectedWmsRequestsCount = 3; // due to metatiling
-        final long wmsRequestCount = wmsRequestsCounter.get();
-        assertEquals(expectedWmsRequestsCount, wmsRequestCount);
+        verify(mockSourceHelper);
     }
 
     /**
@@ -158,10 +159,6 @@ public class SeedTaskTest extends TestCase {
      * @throws Exception
      */
     public void testSeedRetries() throws Exception {
-        WMSLayer tl = createWMSLayer("image/png");
-
-        // create an image to be returned by the mock WMSSourceHelper
-        final byte[] fakeWMSResponse = createFakeSourceImage(tl);
 
         // WMSSourceHelper that on makeRequest() returns always the saqme fake image
         // WMSSourceHelper mockSourceHelper = new MockWMSSourceHelper();///
@@ -202,25 +199,12 @@ public class SeedTaskTest extends TestCase {
         TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
-        /*
-         * Create a mock storage broker that does nothing
-         */
-        final StorageBroker mockStorageBroker = EasyMock.createMock(StorageBroker.class);
-        expect(mockStorageBroker.put((TileObject) anyObject())).andReturn(true).anyTimes();
-        expect(mockStorageBroker.get((TileObject) anyObject())).andReturn(false).anyTimes();
-        replay(mockStorageBroker);
+        final boolean reseed = false;
+        final long totalFailuresBeforeAborting = 4;
+        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, reseed, trIter, tl, 1,10,totalFailuresBeforeAborting, false);
+        SeedTask seedTask = (SeedTask) job.getTasks()[0];
 
-        boolean reseed = false;
-        SeedTask seedTask = new SeedTask(mockStorageBroker, trIter, tl, reseed, false);
-        seedTask.setTaskId(1L);
-        seedTask.setThreadInfo(new AtomicInteger(), 0);
 
-        int tileFailureRetryCount = 1;
-        long tileFailureRetryWaitTime = 10;
-        long totalFailuresBeforeAborting = 4;
-        AtomicLong sharedFailureCounter = new AtomicLong();
-        seedTask.setFailurePolicy(tileFailureRetryCount, tileFailureRetryWaitTime,
-                totalFailuresBeforeAborting, sharedFailureCounter);
         /*
          * HACK: avoid SeedTask.getCurrentThreadArrayIndex failure.
          */
@@ -230,22 +214,36 @@ public class SeedTaskTest extends TestCase {
          * Call the seed process
          */
         seedTask.doAction();
-        assertEquals(totalFailuresBeforeAborting, sharedFailureCounter.get());
+        assertEquals(totalFailuresBeforeAborting, job.getFailures());
     }
 
+    long cellsInSubset(TileLayer tl, String gridSetId, int zoomLevel){
+        final GridSubset gridSubset = tl.getGridSubset(gridSetId);
+
+        final long[] coveredGridLevels = gridSubset.getCoverage(zoomLevel);
+
+        // seeding should not include edge tiles produced by the meta tiling that don't fall into
+        // the gridsubset's coverage
+        final long starty = coveredGridLevels[1];
+        final long startx = coveredGridLevels[0];
+        final long endy = coveredGridLevels[3];
+        final long endx = coveredGridLevels[2];
+
+        final long expectedSavedTileCount = (endx - startx + 1)
+                * (endy - starty + 1);
+        
+        return expectedSavedTileCount;
+    }
+    
     /**
      * Make sure when seeding a given zoom level, the correct tiles are sent to the
      * {@link StorageBroker}
      * 
      * @throws Exception
      */
-    @SuppressWarnings("serial")
     public void testSeedStoredTiles() throws Exception {
 
-        WMSLayer tl = createWMSLayer("image/png");
 
-        // create an image to be returned by the mock WMSSourceHelper
-        // / final byte[] fakeWMSResponse = createFakeSourceImage(tl);
         // WMSSourceHelper that on makeRequest() returns always the saqme fake image
         WMSSourceHelper mockSourceHelper = new MockWMSSourceHelper();// EasyMock.createMock(WMSSourceHelper.class);
         // expect(mockSourceHelper.makeRequest((WMSMetaTile)
@@ -255,34 +253,49 @@ public class SeedTaskTest extends TestCase {
         tl.setSourceHelper(mockSourceHelper);
 
         final String gridSetId = tl.getGridSubsets().iterator().next();
-        final int zoomLevel = 2;
+        final int zoomLevel = 3;
         SeedRequest req = createRequest(tl, TYPE.SEED, zoomLevel, zoomLevel);
+
+        final GridSubset gridSubset = tl.getGridSubset(gridSetId);
+
+        final long[] coveredGridLevels = gridSubset.getCoverage(zoomLevel);
+
+        // seeding should not include edge tiles produced by the meta tiling that don't fall into
+        // the gridsubset's coverage
+        final long starty = coveredGridLevels[1];
+        final long startx = coveredGridLevels[0];
+        final long endy = coveredGridLevels[3];
+        final long endx = coveredGridLevels[2];
 
         /*
          * Create a mock storage broker that has never an image in its blob store and that captures
          * the TileObject the seeder requests it to store for further test validation
          */
-        final StorageBroker mockStorageBroker = EasyMock.createMock(StorageBroker.class);
-        Capture<TileObject> storedObjects = new Capture<TileObject>() {
-            /**
-             * Override because setValue with anyTimes() resets the list of values
-             */
-            @Override
-            public void setValue(TileObject o) {
-                super.getValues().add(o);
+        storageBroker = EasyMock.createMock(StorageBroker.class);
+        
+        // Each tile in the subset should be put in storage once, the order doesn't matter.
+        
+        for (long x = startx; x <= endx; x++) {
+            for (long y = starty; y <= endy; y++) {
+                expect(storageBroker.put(tileObjectAt(x,y,zoomLevel))).andReturn(true).once();
             }
-        };
-        expect(mockStorageBroker.put(capture(storedObjects))).andReturn(true).anyTimes();
-        expect(mockStorageBroker.get((TileObject) anyObject())).andReturn(false).anyTimes();
-        replay(mockStorageBroker);
+        }
+        
+        expect(storageBroker.get((TileObject) anyObject())).andReturn(false).anyTimes();
+        replay(storageBroker);
+        
+        breeder = EasyMock.createMock(ThreadedTileBreeder.class);
+        expect(breeder.getStorageBroker()).andReturn(storageBroker).anyTimes();
+        replay(breeder);
 
         TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
         boolean reseed = false;
-        SeedTask task = new SeedTask(mockStorageBroker, trIter, tl, reseed, false);
+        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, reseed, trIter, tl, 1,1,4, false);
+        SeedTask task = (SeedTask) job.getTasks()[0];
         task.setTaskId(1L);
-        task.setThreadInfo(new AtomicInteger(), 0);
+
         /*
          * HACK: avoid SeedTask.getCurrentThreadArrayIndex failure.
          */
@@ -293,89 +306,7 @@ public class SeedTaskTest extends TestCase {
          */
         task.doAction();
 
-        final GridSubset gridSubset = tl.getGridSubset(gridSetId);
-
-        /*
-         * Make sure the seed process asked for the expected tiles to be stored
-         */
-        final long expectedSavedTileCount;
-
-        final long[] coveredGridLevels = gridSubset.getCoverage(zoomLevel);
-
-        // seeding should not include edge tiles produced by the meta tiling that don't fall into
-        // the gridsubset's coverage
-        long starty = coveredGridLevels[1];
-        long startx = coveredGridLevels[0];
-
-        expectedSavedTileCount = (coveredGridLevels[2] - startx + 1)
-                * (coveredGridLevels[3] - starty + 1);
-
-        List<TileObject> storedTiles = storedObjects.getValues();
-        final int seededTileCount = storedTiles.size();
-
-        assertEquals(expectedSavedTileCount, seededTileCount);
-
-        Set<Tuple<Long>> tileKeys = new TreeSet<Tuple<Long>>();
-        Set<Tuple<Long>> expectedTiles = new TreeSet<Tuple<Long>>();
-        for (long x = startx; x <= coveredGridLevels[2]; x++) {
-            for (long y = starty; y <= coveredGridLevels[3]; y++) {
-                expectedTiles.add(new Tuple<Long>(x, y, (long) zoomLevel));
-            }
-        }
-        for (TileObject obj : storedTiles) {
-            tileKeys.add(new Tuple<Long>(obj.getXYZ()[0], obj.getXYZ()[1], obj.getXYZ()[2]));
-        }
-
-        assertEquals(expectedTiles, tileKeys);
-    }
-
-    private static class Tuple<T extends Comparable<T>> implements Comparable<Tuple<T>> {
-
-        private T[] members;
-
-        public Tuple(T... members) {
-            this.members = members;
-        }
-
-        public int compareTo(Tuple<T> o) {
-            if (members == null) {
-                if (o.members == null) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            if (o.members == null) {
-                return 1;
-            }
-            if (members.length == 0 && o.members.length == 0) {
-                return 0;
-            }
-            if (members.length != o.members.length) {
-                throw new IllegalArgumentException("Tuples shall be of the same dimension");
-            }
-            int comparedVal;
-            for (int i = 0; i < members.length; i++) {
-                comparedVal = members[i].compareTo(o.members[i]);
-                if (comparedVal != 0) {
-                    break;
-                }
-            }
-            return 0;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public boolean equals(Object o) {
-            if (!(o instanceof Tuple)) {
-                return false;
-            }
-            return 0 == compareTo((Tuple<T>) o);
-        }
-
-        public int hashCode() {
-            return 17 * Arrays.hashCode(members);
-        }
+        verify(storageBroker);
     }
 
 }

@@ -17,47 +17,26 @@
  */
 package org.geowebcache.seed;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.geowebcache.GeoWebCacheException;
 import org.geowebcache.conveyor.ConveyorTile;
-import org.geowebcache.filter.request.RequestFilter;
 import org.geowebcache.layer.TileLayer;
 import org.geowebcache.layer.wms.WMSLayer;
-import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileRange;
-import org.geowebcache.storage.TileRangeIterator;
 
 /**
  * A GWCTask for seeding/reseeding the cache.
  *
  */
-class SeedTask extends GWCTask {
+public class SeedTask extends GWCTask {
     private static Log log = LogFactory.getLog(org.geowebcache.seed.SeedTask.class);
 
-    private final TileRangeIterator trIter;
+    //private StorageBroker storageBroker;
 
-    private final TileLayer tl;
-
-    private boolean reseed;
-
-    private boolean doFilterUpdate;
-
-    private StorageBroker storageBroker;
-
-    private int tileFailureRetryCount;
-
-    private long tileFailureRetryWaitTime;
-
-    private long totalFailuresBeforeAborting;
-
-    private AtomicLong sharedFailureCounter;
+    private SeedJob parentSeedJob;
 
     /**
      * Constructs a SeedTask
@@ -67,30 +46,15 @@ class SeedTask extends GWCTask {
      * @param reseed
      * @param doFilterUpdate
      */
-    public SeedTask(StorageBroker sb, TileRangeIterator trIter, TileLayer tl, boolean reseed,
-            boolean doFilterUpdate) {
-        this.storageBroker = sb;
-        this.trIter = trIter;
-        this.tl = tl;
-        this.reseed = reseed;
-        this.doFilterUpdate = doFilterUpdate;
-
-        tileFailureRetryCount = 0;
-        tileFailureRetryWaitTime = 100;
-        totalFailuresBeforeAborting = 10000;
-        sharedFailureCounter = new AtomicLong();
-
-        if (reseed) {
-            super.parsedType = GWCTask.TYPE.RESEED;
-        } else {
-            super.parsedType = GWCTask.TYPE.SEED;
-        }
-        super.layerName = tl.getName();
+    public SeedTask(long taskId, SeedJob job) {
+        super(
+                taskId, job, 
+                job.isReseed() ? GWCTask.TYPE.RESEED: GWCTask.TYPE.SEED);
+        this.parentSeedJob = job;
 
         super.state = GWCTask.STATE.READY;
     }
-
-    // TODO: refactoring this into smaller functions might improve readability
+    
     @Override
     protected void doActionInternal() throws GeoWebCacheException, InterruptedException {
         super.state = GWCTask.STATE.RUNNING;
@@ -104,90 +68,57 @@ class SeedTask extends GWCTask {
         // approximate thread creation time
         final long START_TIME = System.currentTimeMillis();
 
-        final String layerName = tl.getName();
+        final String layerName = parentJob.getLayer().getName();
         log.info(Thread.currentThread().getName() + " begins seeding layer : " + layerName);
 
-        TileRange tr = trIter.getTileRange();
+        TileRange tr = parentJob.getRange();
 
         checkInterrupted();
         // TODO move to TileRange object, or distinguish between thread and task
         super.tilesTotal = tileCount(tr);
 
-        final int metaTilingFactorX = tl.getMetaTilingFactors()[0];
-        final int metaTilingFactorY = tl.getMetaTilingFactors()[1];
+        final int metaTilingFactorX = parentJob.getLayer().getMetaTilingFactors()[0];
+        final int metaTilingFactorY = parentJob.getLayer().getMetaTilingFactors()[1];
 
-        final boolean tryCache = !reseed;
+        final boolean tryCache = !parentSeedJob.isReseed();
 
         checkInterrupted();
-        long[] gridLoc = trIter.nextMetaGridLocation(new long[3]);
 
         long seedCalls = 0;
-        while (gridLoc != null && this.terminate == false) {
+        TileRequest request = null;
+        while ((request = parentJob.getNextLocation()) != null && this.terminate == false) {
 
             checkInterrupted();
             Map<String, String> fullParameters = tr.getParameters();
 
-            ConveyorTile tile = new ConveyorTile(storageBroker, layerName, tr.getGridSetId(), gridLoc,
+            ConveyorTile tile = new ConveyorTile(parentSeedJob.getBreeder().getStorageBroker(), layerName, tr.getGridSetId(), request.getGridLoc(),
                     tr.getMimeType(), fullParameters, null, null);
 
-            for (int fetchAttempt = 0; fetchAttempt <= tileFailureRetryCount; fetchAttempt++) {
-                try {
-                    checkInterrupted();
-                    tl.seedTile(tile, tryCache);
-                    break;// success, let it go
-                } catch (Exception e) {
-                    // if GWC_SEED_RETRY_COUNT was not set then none of the settings have effect, in
-                    // order to keep backwards compatibility with the old behaviour
-                    if (tileFailureRetryCount == 0) {
-                        if (e instanceof GeoWebCacheException) {
-                            throw (GeoWebCacheException) e;
-                        }
-                        throw new GeoWebCacheException(e);
-                    }
-
-                    long sharedFailureCount = sharedFailureCounter.incrementAndGet();
-                    if (sharedFailureCount >= totalFailuresBeforeAborting) {
-                        log.info("Aborting seed thread " + Thread.currentThread().getName()
-                                + ". Error count reached configured maximum of "
-                                + totalFailuresBeforeAborting);
-                        super.state = GWCTask.STATE.DEAD;
-                        return;
-                    }
-                    String logMsg = "Seed failed at " + tile.toString() + " after "
-                            + (fetchAttempt + 1) + " of " + (tileFailureRetryCount + 1)
-                            + " attempts.";
-                    if (fetchAttempt < tileFailureRetryCount) {
-                        log.debug(logMsg);
-                        if (tileFailureRetryWaitTime > 0) {
-                            log.trace("Waiting " + tileFailureRetryWaitTime
-                                    + " before trying again");
-                            Thread.sleep(tileFailureRetryCount);
-                        }
-                    } else {
-                        log.info(logMsg
-                                + " Skipping and continuing with next tile. Original error: "
-                                + e.getMessage());
-                    }
+            try {
+                checkInterrupted();
+                parentJob.getLayer().seedTile(tile, tryCache); // Try to seed
+                
+                if (log.isTraceEnabled()) {
+                    log.trace(Thread.currentThread().getName() + " seeded " + request.toString());
                 }
+                
+                // final long totalTilesCompleted = trIter.getTilesProcessed();
+                // note: computing the # of tiles processed by this thread instead of by the whole group
+                // also reduces thread contention as the trIter methods are synchronized and profiler
+                // shows 16 threads block on synchronization about 40% the time
+                final long tilesCompletedByThisThread = seedCalls * metaTilingFactorX
+                        * metaTilingFactorY;
+
+                updateStatusInfo(parentJob.getLayer(), tilesCompletedByThisThread, START_TIME);
+
+                checkInterrupted();
+                seedCalls++;
+                
+            } catch (Exception e) {
+                parentSeedJob.failure(this, request, e); // Handle Failure
             }
-
-            if (log.isTraceEnabled()) {
-                log.trace(Thread.currentThread().getName() + " seeded " + Arrays.toString(gridLoc));
-            }
-
-            // final long totalTilesCompleted = trIter.getTilesProcessed();
-            // note: computing the # of tiles processed by this thread instead of by the whole group
-            // also reduces thread contention as the trIter methods are synchronized and profiler
-            // shows 16 threads block on synchronization about 40% the time
-            final long tilesCompletedByThisThread = seedCalls * metaTilingFactorX
-                    * metaTilingFactorY;
-
-            updateStatusInfo(tl, tilesCompletedByThisThread, START_TIME);
-
-            checkInterrupted();
-            seedCalls++;
-            gridLoc = trIter.nextMetaGridLocation(gridLoc);
-        }
+            
+        } // Iterate over tile requests.
 
         if (this.terminate) {
             log.info("Job on " + Thread.currentThread().getName() + " was terminated after "
@@ -198,9 +129,13 @@ class SeedTask extends GWCTask {
         }
 
         checkInterrupted();
-        if (threadOffset == 0 && doFilterUpdate) {
-            runFilterUpdates(tr.getGridSetId());
-        }
+        
+        // TODO:  This seems to be waiting for the first thread that started running?  
+        //        Wouldn't the last to stop be more appropriate
+        //        Move to the finished handler in the job?
+        //if (threadOffset == 0 && doFilterUpdate) {
+        //    runFilterUpdates(tr.getGridSetId());
+        //}
 
         super.state = GWCTask.STATE.DONE;
     }
@@ -256,45 +191,17 @@ class SeedTask extends GWCTask {
         // estimated time of completion in seconds, use a moving average over the last
         this.timeSpent = (int) (System.currentTimeMillis() - start_time) / 1000;
 
-        int threadCount = sharedThreadCount.get();
+        long threadCount = parentJob.getThreadCount();
         long timeTotal = Math.round((double) timeSpent
                 * (((double) tilesTotal / threadCount) / (double) tilesCount));
 
         this.timeRemaining = (int) (timeTotal - timeSpent);
     }
 
-    /**
-     * Updates any request filters
-     */
-    private void runFilterUpdates(String gridSetId) {
-        // We will assume that all filters that can be updated should be updated
-        List<RequestFilter> reqFilters = tl.getRequestFilters();
-        if (reqFilters != null && !reqFilters.isEmpty()) {
-            Iterator<RequestFilter> iter = reqFilters.iterator();
-            while (iter.hasNext()) {
-                RequestFilter reqFilter = iter.next();
-                if (reqFilter.update(tl, gridSetId)) {
-                    log.info("Updated request filter " + reqFilter.getName());
-                } else {
-                    log.debug("Request filter " + reqFilter.getName()
-                            + " returned false on update.");
-                }
-            }
-        }
-    }
-
-    public void setFailurePolicy(int tileFailureRetryCount, long tileFailureRetryWaitTime,
-            long totalFailuresBeforeAborting, AtomicLong sharedFailureCounter) {
-        this.tileFailureRetryCount = tileFailureRetryCount;
-        this.tileFailureRetryWaitTime = tileFailureRetryWaitTime;
-        this.totalFailuresBeforeAborting = totalFailuresBeforeAborting;
-        this.sharedFailureCounter = sharedFailureCounter;
-    }
-
     @Override
     protected void dispose() {
-        if (tl instanceof WMSLayer) {
-            ((WMSLayer) tl).cleanUpThreadLocals();
+        if (parentJob.getLayer() instanceof WMSLayer) {
+            ((WMSLayer) parentJob.getLayer()).cleanUpThreadLocals();
         }
     }
 }

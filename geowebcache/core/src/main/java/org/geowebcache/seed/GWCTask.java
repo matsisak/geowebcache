@@ -27,6 +27,7 @@ import org.geowebcache.GeoWebCacheException;
  */
 public abstract class GWCTask {
 
+    @SuppressWarnings("unused")
     private static final Log log = LogFactory.getLog(GWCTask.class);
 
     public static enum TYPE {
@@ -37,21 +38,17 @@ public abstract class GWCTask {
         UNSET, READY, RUNNING, DONE, DEAD
     };
 
-    /**
-     * Value shared between all the threads in the group, is incremented each time a task starts
-     * working and decremented each time one task finishes (either normally or abnormally)
-     */
-    protected AtomicInteger sharedThreadCount = new AtomicInteger();
+    //protected int threadOffset = 0;
 
-    protected int threadOffset = 0;
+    protected final Job parentJob;
+    
+    protected final long taskId;
 
-    long taskId = -1;
-
-    protected TYPE parsedType = TYPE.UNSET;
+    protected final TYPE parsedType; // = TYPE.UNSET; // TODO Do we need the UNSET type?
 
     protected STATE state = STATE.UNSET;
 
-    protected String layerName = null;
+    // protected final String layerName;
 
     protected long timeSpent = -1;
 
@@ -62,28 +59,32 @@ public abstract class GWCTask {
     protected long tilesTotal = -1;
 
     protected boolean terminate = false;
+    
+    //private long groupStartTime;
 
-    private long groupStartTime;
-
+    
+    
+    public GWCTask(long taskId, Job parentJob, TYPE parsedType) {
+        super();
+        this.taskId = taskId;
+        this.parentJob = parentJob;
+        this.parsedType = parsedType;
+    }
     /**
      * Marks this task as active in the group by incrementing the shared counter, delegates to
      * {@link #doActionInternal()}, and makes sure to remove this task from the group count.
      */
     public final void doAction() throws GeoWebCacheException, InterruptedException {
-        this.sharedThreadCount.incrementAndGet();
-        this.groupStartTime = System.currentTimeMillis();
+        parentJob.threadStarted(this);
         try {
             doActionInternal();
         } finally {
             dispose();
-            int membersRemaining = this.sharedThreadCount.decrementAndGet();
-            if (0 == membersRemaining) {
-                double groupTotalTimeSecs = (System.currentTimeMillis() - (double) groupStartTime) / 1000;
-                log.info("Thread group finished " + parsedType + " task after "
-                        + groupTotalTimeSecs + " seconds");
-            }
+            parentJob.threadStopped(this);
         }
     }
+
+
 
     protected abstract void dispose();
 
@@ -100,28 +101,28 @@ public abstract class GWCTask {
      *            REVISIT: may not be needed anymore. Just check if sharedThreadCount == 1?
      */
     public void setThreadInfo(AtomicInteger sharedThreadCount, int threadOffset) {
-        this.sharedThreadCount = sharedThreadCount;
-        this.threadOffset = threadOffset;
+        //this.threadOffset = threadOffset;
     }
 
     public void setTaskId(long taskId) {
-        this.taskId = taskId;
+        // TODO Should this be set at dispatch or creation? this.taskId = taskId;
     }
 
     public long getTaskId() {
         return taskId;
     }
 
-    public int getThreadCount() {
-        return sharedThreadCount.get();
+    public Job getJob() {
+        return parentJob;
     }
 
     public int getThreadOffset() {
-        return threadOffset;
+        //return threadOffset;
+        return -1; //FIXME
     }
 
     public String getLayerName() {
-        return layerName;
+        return parentJob.getLayer().getName();
     }
 
     /**
@@ -177,5 +178,16 @@ public abstract class GWCTask {
         return new StringBuilder("[").append(getTaskId()).append(": ").append(getLayerName())
                 .append(", ").append(getType()).append(", ").append(getState()).append("]")
                 .toString();
+    }
+    
+    public TaskStatus getStatus(){
+       return new TaskStatus(
+                System.currentTimeMillis(),
+                getTilesDone(),
+                getTilesTotal(),
+                getTimeRemaining(),
+                getTaskId(),
+                getState()
+                );
     }
 }

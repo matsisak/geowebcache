@@ -20,15 +20,18 @@
 
 package org.geowebcache.seed;
 
+import java.util.Collection;
 import java.util.Iterator;
+import java.util.concurrent.Callable;
+
+import junit.framework.Assert;
 
 import org.geowebcache.GeoWebCacheException;
 import org.geowebcache.layer.TileLayer;
 import org.geowebcache.layer.TileLayerDispatcher;
+import org.geowebcache.seed.threaded.ThreadedTileBreeder;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileRange;
-import org.springframework.beans.BeansException;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
 /**
@@ -73,7 +76,7 @@ import org.springframework.context.ApplicationContextAware;
  * 
  * @author Kevin Smith, based on Gabriel Roldan's class, now renamed {@link ThreadedTileBreeder}
  */
-public interface TileBreeder extends ApplicationContextAware {
+public abstract class TileBreeder {
 
 /**
  * Create and dispatch tasks to fulfil a seed request
@@ -96,7 +99,7 @@ public abstract void seed(String layerName, SeedRequest sr)
  * @return Array of tasks.  Will have length threadCount or 1.
  * @throws GeoWebCacheException
  */
-public abstract GWCTask[] createTasks(TileRange tr, GWCTask.TYPE type,
+public abstract Job createJob(TileRange tr, GWCTask.TYPE type,
         int threadCount, boolean filterUpdate) throws GeoWebCacheException;
 
 /**
@@ -110,16 +113,16 @@ public abstract GWCTask[] createTasks(TileRange tr, GWCTask.TYPE type,
  * @return Array of tasks.  Will have length threadCount or 1.
  * @throws GeoWebCacheException
  */
-public abstract GWCTask[] createTasks(TileRange tr, TileLayer tl,
+public abstract Job createJob(TileRange tr, TileLayer tl,
         GWCTask.TYPE type, int threadCount, boolean filterUpdate)
         throws GeoWebCacheException;
 
 /**
- * Dispatches tasks 
+ * Dispatches a Job
  * 
- * @param tasks
+ * @param job
  */
-public abstract void dispatchTasks(GWCTask[] tasks);
+public abstract void dispatchJob(Job job);
 
 /**
  * Method returns List of Strings representing the status of the currently running and scheduled
@@ -128,6 +131,7 @@ public abstract void dispatchTasks(GWCTask[] tasks);
  * @return array of {@code [[tilesDone, tilesTotal, tilesRemaining, taskID, taskStatus],...]}
  *         where {@code taskStatus} is one of:
  *         {@code 0 = PENDING, 1 = RUNNING, 2 = DONE, -1 = ABORTED}
+ * @deprecated
  */
 public abstract long[][] getStatusList();
 
@@ -140,8 +144,35 @@ public abstract long[][] getStatusList();
  *         {@code 0 = PENDING, 1 = RUNNING, 2 = DONE, -1 = ABORTED}
  * @param layerName the name of the layer.  null for all layers.
  * @return
+ * @deprecated
  */
 public abstract long[][] getStatusList(String layerName);
+
+/**
+ * Get the status of currently running or scheduled Jobs.
+ * @return
+ */
+public abstract Collection<JobStatus> getJobStatusList();
+
+/**
+ * Get the status of currently running or scheduled Jobs on a specific layer.
+ * @param layerName the name of the layer.  null for all layers.
+ * @return
+ */
+public abstract Collection<JobStatus> getJobStatusList(String layerName);
+
+/**
+ * Get the status of currently running or scheduled Tasks.
+ * @return
+ */
+public abstract Collection<TaskStatus> getTaskStatusList();
+
+/**
+ * Get the status of currently running or scheduled Tasks on a specific layer.
+ * @param layerName the name of the layer.  null for all layers.
+ * @return
+ */
+public abstract Collection<TaskStatus> getTaskStatusList(String layerName);
 
 public abstract void setTileLayerDispatcher(
         TileLayerDispatcher tileLayerDispatcher);
@@ -191,5 +222,15 @@ public abstract boolean terminateGWCTask(long id);
  * @return
  */
 public abstract Iterable<TileLayer> getLayers();
+
+protected Callable<GWCTask> wrapTask(GWCTask task) {
+    Assert.assertSame(this, task.parentJob.getBreeder());
+    return new MTSeeder(task);
+}
+
+protected void setTaskState(GWCTask task, GWCTask.STATE state){
+    Assert.assertSame(this, task.parentJob.getBreeder());
+    task.state = state;
+}
 
 }
