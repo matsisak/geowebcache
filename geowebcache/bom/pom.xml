@@ -1,0 +1,85 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.geowebcache</groupId>
+	<artifactId>gwc-bom</artifactId>
+	<version>1.4-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>Geowebcache Bill Of Materials</name>
+	<description>This is the "Bill of Materials" for using Geowebcache as a library in other projects. It is the parent of the patched geowebcache/pom.xml, and defines the versions for the submodules in it's dependencyManagement sectin.</description>
+
+	<properties>
+		<gwc-version>1.4-SNAPSHOT</gwc-version>
+		<gwc-version-test>1.4-SNAPSHOT</gwc-version-test>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-core</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-georss</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-gmaps</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-kml</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-rest</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-tms</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-ve</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-wms</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-wmts</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-diskquota-bdb</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-diskquota-jdbc</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.geowebcache</groupId>
+				<artifactId>gwc-arcgiscache</artifactId>
+				<version>${gwc-version}</version>
+			</dependency>
+
+		</dependencies>
+	</dependencyManagement>
+	
+	<modules>
+		<module>geowebcache</module>
+	</modules>
+</project>
