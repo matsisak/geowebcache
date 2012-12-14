@@ -17,19 +17,16 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
     <dependency>
       <groupId>com.vividsolutions</groupId>
       <artifactId>jts</artifactId>
-      <version>${jts.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-coverage</artifactId>
-      <version>${gt.version}</version>
     </dependency>
 
     <dependency>
@@ -50,7 +47,6 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
       <classifier>tests</classifier>
     </dependency>

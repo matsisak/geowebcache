@@ -18,7 +18,6 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
@@ -28,14 +27,12 @@
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-wms</artifactId>
-      <version>${gt.version}</version>
       <!-- optional>true</optional -->
     </dependency>
 
 	<dependency>
     	<groupId>commons-httpclient</groupId>
     	<artifactId>commons-httpclient</artifactId>
-    	<version>3.1</version>
     </dependency>
 
     <!-- test dependencies -->
