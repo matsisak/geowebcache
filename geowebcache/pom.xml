@@ -10,10 +10,8 @@
 	  <relativePath>bom/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.geowebcache</groupId>
   <artifactId>geowebcache</artifactId>
   <packaging>pom</packaging>
-  <version>1.4-SNAPSHOT</version>
   <name>geowebcache</name>
   <url>http://geowebcache.org</url>
 

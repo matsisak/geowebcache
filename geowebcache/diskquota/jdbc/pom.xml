@@ -8,7 +8,6 @@
     <artifactId>gwc-diskquota</artifactId>
     <version>1.4-SNAPSHOT</version>
   </parent>
-  <groupId>org.geowebcache</groupId>
   <artifactId>gwc-diskquota-jdbc</artifactId>
   <packaging>jar</packaging>
   <name>Disk Quota management module - JDBC backends</name>
