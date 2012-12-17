@@ -6,11 +6,11 @@ import java.io.InputStreamReader;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.mortbay.jetty.Connector;
-import org.mortbay.jetty.Server;
-import org.mortbay.jetty.bio.SocketConnector;
-import org.mortbay.jetty.webapp.WebAppContext;
-import org.mortbay.thread.QueuedThreadPool;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 /**
  * Jetty starter, will run GeoWebCache inside the Jetty web container.<br>
@@ -24,10 +24,16 @@ public class Start {
     private static final Log log = LogFactory.getLog(Start.class);
 
     public static void main(String[] args) {
-        final Server jettyServer = new Server();
+        // Use this to set a limit on the number of threads used to respond requests
+        QueuedThreadPool tp = new QueuedThreadPool();
+        tp.setMinThreads(50);
+        tp.setMaxThreads(50);
+        
+        final Server jettyServer = new Server(tp);
 
         try {
-            SocketConnector conn = new SocketConnector();
+            ServerConnector conn = new ServerConnector(jettyServer);
+//            SocketConnector conn = new SocketConnector();
             String portVariable = System.getProperty("jetty.port");
             int port = parsePort(portVariable);
             if (port <= 0)
@@ -42,11 +48,6 @@ public class Start {
             jettyServer.setHandler(wah);
             wah.setTempDirectory(new File("target/work"));
 
-            // Use this to set a limit on the number of threads used to respond requests
-             QueuedThreadPool tp = new QueuedThreadPool();
-             tp.setMinThreads(50);
-             tp.setMaxThreads(50);
-             conn.setThreadPool(tp);
 
             jettyServer.start();
 
