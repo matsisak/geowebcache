@@ -6,7 +6,6 @@ import java.io.InputStreamReader;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
@@ -40,7 +39,8 @@ public class Start {
                 port = 8080;
             conn.setPort(port);
             conn.setAcceptQueueSize(100);
-            jettyServer.setConnectors(new Connector[] { conn });
+            jettyServer.addConnector(conn);
+//            jettyServer.setConnectors(new Connector[] { conn });
 
             WebAppContext wah = new WebAppContext();
             wah.setContextPath("/geowebcache");
