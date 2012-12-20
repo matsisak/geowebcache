@@ -75,7 +75,7 @@ public class SeedTask extends GWCTask {
 
         checkInterrupted();
         // TODO move to TileRange object, or distinguish between thread and task
-        super.tilesTotal = tileCount(tr);
+        super.tilesTotal = tr.tileCount();
 
         final int metaTilingFactorX = parentJob.getLayer().getMetaTilingFactors()[0];
         final int metaTilingFactorY = parentJob.getLayer().getMetaTilingFactors()[1];
@@ -138,39 +138,6 @@ public class SeedTask extends GWCTask {
         //}
 
         super.state = GWCTask.STATE.DONE;
-    }
-
-    /**
-     * helper for counting the number of tiles
-     * 
-     * @param tr
-     * @return -1 if too many
-     */
-    private long tileCount(TileRange tr) {
-
-        final int startZoom = tr.getZoomStart();
-        final int stopZoom = tr.getZoomStop();
-
-        long count = 0;
-
-        for (int z = startZoom; z <= stopZoom; z++) {
-            long[] gridBounds = tr.rangeBounds(z);
-
-            final long minx = gridBounds[0];
-            final long maxx = gridBounds[2];
-            final long miny = gridBounds[1];
-            final long maxy = gridBounds[3];
-
-            long thisLevel = (1 + maxx - minx) * (1 + maxy - miny);
-
-            if (thisLevel > (Long.MAX_VALUE / 4) && z != stopZoom) {
-                return -1;
-            } else {
-                count += thisLevel;
-            }
-        }
-
-        return count;
     }
 
     /**
