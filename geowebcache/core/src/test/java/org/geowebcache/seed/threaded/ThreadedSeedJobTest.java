@@ -67,10 +67,8 @@ import org.geowebcache.storage.TileRangeIterator;
 import org.geowebcache.util.MockWMSSourceHelper;
 
 /**
- * Unit test suite for {@link SeedTask}
+ * Unit test suite for {@link ThreadedSeedJob}
  * 
- * @author Gabriel Roldan (OpenGeo)
- * @version $Id$
  */
 public class ThreadedSeedJobTest extends AbstractJobTest {
 
@@ -319,6 +317,10 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         verify(storageBroker);
     }
 
+    /**
+     * Check that failure and the retry queue work correctly
+     * @throws Exception
+     */
     public void testGetNextRequestWithRetry() throws Exception {
         TileRangeIterator tri = createMock(TileRangeIterator.class);
         
