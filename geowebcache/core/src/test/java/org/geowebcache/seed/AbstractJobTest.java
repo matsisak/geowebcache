@@ -41,6 +41,10 @@ public static void assertTileRequestAt(TileRequest tr, long[] gridLoc){
             tr.getX()==gridLoc[0] && tr.getY()==gridLoc[1] && tr.getZoom()==gridLoc[2]);
 }
 
+/**
+ * Test that getNextRequest behaves as expected
+ * @throws Exception
+ */
 public void testGetNextRequest() throws Exception {
     TileRangeIterator tri = createMock(TileRangeIterator.class);
     
