@@ -264,7 +264,9 @@ public class ThreadedTileBreeder extends TileBreeder implements ApplicationConte
         ThreadedJob job;
         switch (type) {
         case TRUNCATE:
-            throw new UnsupportedOperationException(); // TODO
+            job = new ThreadedTruncateJob(currentJobId.getAndIncrement(), this, 
+                    trIter, tl, filterUpdate);
+            break;
         case SEED:
             job = new ThreadedSeedJob(currentJobId.getAndIncrement(), threadCount,
                     this, false, trIter, tl, tileFailureRetryCount, tileFailureRetryWaitTime,
