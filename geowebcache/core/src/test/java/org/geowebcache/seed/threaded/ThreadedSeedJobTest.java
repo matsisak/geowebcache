@@ -318,7 +318,10 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
     }
 
     /**
-     * Check that failure and the retry queue work correctly
+     * Check that failure and the retry queue work correctly.
+     * 
+     * Note, this test is depends on timing.  Using a debugger may alter its behaviour.
+     * 
      * @throws Exception
      */
     public void testGetNextRequestWithRetry() throws Exception {
