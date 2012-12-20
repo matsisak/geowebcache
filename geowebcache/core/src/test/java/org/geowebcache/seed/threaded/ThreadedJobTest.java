@@ -40,4 +40,21 @@ public class ThreadedJobTest extends AbstractJobTest {
         return job;
     }
 
+    @Override
+    protected Job initNextLocation(TileRangeIterator tri) {
+        ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+        replay(breeder);
+        TileLayer tl = createMock(TileLayer.class);
+        replay(tl);
+        
+ThreadedJob job = new ThreadedJob(0, breeder, tl, 1, tri, false) {
+            
+        };
+        
+        job.threads=new GWCTask[1];
+        job.threads[0] = createMock(GWCTask.class);
+        
+        return job;
+    }
+
 }

@@ -49,11 +49,15 @@ import org.geowebcache.layer.TileResponseReceiver;
 import org.geowebcache.layer.wms.WMSLayer;
 import org.geowebcache.layer.wms.WMSMetaTile;
 import org.geowebcache.layer.wms.WMSSourceHelper;
+import org.geowebcache.seed.AbstractJobTest;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.GWCTask.STATE;
+import org.geowebcache.seed.Job;
+import org.geowebcache.seed.SeedJob;
 import org.geowebcache.seed.SeedRequest;
 import org.geowebcache.seed.SeedTask;
 import org.geowebcache.seed.GWCTask.TYPE;
+import org.geowebcache.seed.TileRequest;
 import org.geowebcache.seed.threaded.ThreadedSeedJob;
 import org.geowebcache.seed.threaded.ThreadedTileBreeder;
 import org.geowebcache.storage.StorageBroker;
@@ -68,7 +72,7 @@ import org.geowebcache.util.MockWMSSourceHelper;
  * @author Gabriel Roldan (OpenGeo)
  * @version $Id$
  */
-public class ThreadedSeedJobTest extends TestCase {
+public class ThreadedSeedJobTest extends AbstractJobTest {
 
     ThreadedTileBreeder breeder;
     StorageBroker storageBroker;
@@ -316,6 +320,82 @@ public class ThreadedSeedJobTest extends TestCase {
         task.doAction();
 
         verify(storageBroker);
+    }
+
+    public void testGetNextRequestWithRetry() throws Exception {
+        TileRangeIterator tri = createMock(TileRangeIterator.class);
+        
+        expect(tri.nextMetaGridLocation()).andReturn(new long[] {1,2,3});
+        expect(tri.nextMetaGridLocation()).andReturn(new long[] {4,5,6});
+        expect(tri.nextMetaGridLocation()).andReturn(null).anyTimes();
+        replay(tri);
+        
+        SeedJob job = (SeedJob) initNextLocation(tri);
+        
+        TileRequest tr;
+        
+        GWCTask task = job.getTasks()[0];
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {1,2,3});
+        assertEquals(0, tr.getFailures());
+        
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        Thread.sleep(10); // Make sure we give it time to get through the queue.
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {1,2,3});
+        assertEquals(1, tr.getFailures());
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {4,5,6});
+        assertEquals(0, tr.getFailures());
+        
+        tr = job.getNextLocation();
+        assertNull(tr);
+        
+        tr = job.getNextLocation();
+        assertNull(tr);
+    }
+
+    
+    @Override
+    protected Job initNextLocation(TileRangeIterator tri) {
+        ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+        replay(breeder);
+        TileLayer tl = createMock(TileLayer.class);
+        replay(tl);
+        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, false, tri, tl, 1,10,4, false);
+        
+        GWCTask task = createMock(GWCTask.class);
+        expect(task.getJob()).andReturn(job).anyTimes();
+        replay(task);
+        job.threads[0] = task;
+
+        return job;
+    }
+
+    @Override
+    protected Job jobWithTaskStates(STATE... states) {
+        ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+        replay(breeder);
+        TileLayer tl = createMock(TileLayer.class);
+        replay(tl);
+        TileRangeIterator tri = createMock(TileRangeIterator.class);
+        replay(tri);
+        
+        ThreadedSeedJob job = new ThreadedSeedJob(1,states.length, breeder, false, tri, tl, 1,1,4, false);
+        
+        // Replace the threads with mocks.
+        for(int i=0; i<states.length; i++){
+            GWCTask task = createMock(GWCTask.class);
+            expect(task.getState()).andReturn(states[i]).anyTimes();
+            expect(task.getJob()).andReturn(job).anyTimes();
+            replay(task);
+            job.threads[i] = task;
+        }
+        
+        return job;
     }
 
 }

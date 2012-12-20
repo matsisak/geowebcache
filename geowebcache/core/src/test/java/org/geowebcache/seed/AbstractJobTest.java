@@ -1,7 +1,9 @@
 package org.geowebcache.seed;
 
+import static org.easymock.classextension.EasyMock.*;
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.Job;
+import org.geowebcache.storage.TileRangeIterator;
 
 import junit.framework.TestCase;
 
@@ -17,6 +19,44 @@ public AbstractJobTest() {
 
 public AbstractJobTest(String name) {
     super(name);
+}
+
+/**
+ * Return a Job with a single EasyMocked task and initialised with the provided TileRangeIterator
+ * @param tri
+ * @return
+ */
+protected abstract Job initNextLocation(TileRangeIterator tri);
+
+/**
+ * Assert that a TileRequest is at the specified grid location
+ * @param tr TileRequest to compare
+ * @param gridLoc expected grid location {x,y,zoom}
+ */
+public static void assertTileRequestAt(TileRequest tr, long[] gridLoc){
+    assertTrue(String.format("Expected: TileRequest at <%d, %d, %d>, Result: TileRequest at <%d, %d, %d>", gridLoc[0], gridLoc[1], gridLoc[2], tr.getX(), tr.getY(), tr.getZoom()),
+            tr.getX()==gridLoc[0] && tr.getY()==gridLoc[1] && tr.getZoom()==gridLoc[2]);
+}
+
+public void testGetNextRequest() throws Exception {
+    TileRangeIterator tri = createMock(TileRangeIterator.class);
+    
+    expect(tri.nextMetaGridLocation()).andReturn(new long[] {1,2,3});
+    expect(tri.nextMetaGridLocation()).andReturn(new long[] {4,5,6});
+    expect(tri.nextMetaGridLocation()).andReturn(null).anyTimes();
+    replay(tri);
+    
+    Job job = initNextLocation(tri);
+    
+    TileRequest tr;
+    tr = job.getNextLocation();
+    assertTileRequestAt(tr, new long[] {1,2,3});
+    tr = job.getNextLocation();
+    assertTileRequestAt(tr, new long[] {4,5,6});
+    tr = job.getNextLocation();
+    assertNull(tr);
+    tr = job.getNextLocation();
+    assertNull(tr);
 }
 
 /**
