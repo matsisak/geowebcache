@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.geowebcache.GeoWebCacheException;
+import org.springframework.util.Assert;
 
 /**
  * 
@@ -75,6 +76,7 @@ public abstract class GWCTask {
      * {@link #doActionInternal()}, and makes sure to remove this task from the group count.
      */
     public final void doAction() throws GeoWebCacheException, InterruptedException {
+        Assert.state(this.state==STATE.READY, "Task can not be started as it is "+state+" rather than READY");
         parentJob.threadStarted(this);
         try {
             doActionInternal();
@@ -93,32 +95,12 @@ public abstract class GWCTask {
      */
     protected abstract void doActionInternal() throws GeoWebCacheException, InterruptedException;
 
-    /**
-     * @param sharedThreadCount
-     *            a counter of number of active tasks in the task group, incremented when this task
-     *            starts working and decremented when it stops
-     * @param threadOffset
-     *            REVISIT: may not be needed anymore. Just check if sharedThreadCount == 1?
-     */
-    public void setThreadInfo(AtomicInteger sharedThreadCount, int threadOffset) {
-        //this.threadOffset = threadOffset;
-    }
-
-    public void setTaskId(long taskId) {
-        // TODO Should this be set at dispatch or creation? this.taskId = taskId;
-    }
-
     public long getTaskId() {
         return taskId;
     }
 
     public Job getJob() {
         return parentJob;
-    }
-
-    public int getThreadOffset() {
-        //return threadOffset;
-        return -1; //FIXME
     }
 
     public String getLayerName() {
@@ -169,6 +151,7 @@ public abstract class GWCTask {
     protected void checkInterrupted() throws InterruptedException {
         if (Thread.interrupted()) {
             this.state = STATE.DEAD;
+            parentJob.threadStopped(this);
             throw new InterruptedException();
         }
     }

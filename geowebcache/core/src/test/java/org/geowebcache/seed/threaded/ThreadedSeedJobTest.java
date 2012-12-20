@@ -143,8 +143,6 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, reseed, trIter, tl, 1,1,4, false);
         SeedTask seedTask = (SeedTask) job.getTasks()[0];
         
-        seedTask.setTaskId(1L);
-        seedTask.setThreadInfo(new AtomicInteger(), 0);
         /*
          * HACK: avoid SeedTask.getCurrentThreadArrayIndex failure.
          */
@@ -307,7 +305,6 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         boolean reseed = false;
         ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, reseed, trIter, tl, 1,1,4, false);
         SeedTask task = (SeedTask) job.getTasks()[0];
-        task.setTaskId(1L);
 
         /*
          * HACK: avoid SeedTask.getCurrentThreadArrayIndex failure.

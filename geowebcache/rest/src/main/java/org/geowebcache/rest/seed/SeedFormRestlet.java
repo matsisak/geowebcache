@@ -527,8 +527,7 @@ public class SeedFormRestlet extends GWCRestlet {
             doc.append("<td>").append(tilesDoneStr).append("</td>");
             doc.append("<td>").append(timeSpent).append("</td>");
             doc.append("<td>").append(timeRemaining).append("</td>");
-            doc.append("<td>(Task ").append(task.getThreadOffset() + 1).append(" of ")
-                    .append(task.getJob().getThreadCount()).append(") </td>");
+            doc.append("<td>").append(task.getJob().getThreadCount()).append("</td>");
             doc.append("<td>").append(makeThreadKillForm(task.getTaskId(), tl)).append("</td>");
             doc.append("<tr>");
         }
@@ -539,6 +538,7 @@ public class SeedFormRestlet extends GWCRestlet {
         doc.append("<p><a href=\"./" + layerName + "\">Refresh list</a></p>\n");
     }
 
+    // TODO
     private void makeJobList(StringBuilder doc, TileLayer tl, boolean listAll) {
 
         doc.append(makeKillallThreadsForm(tl, listAll));
@@ -606,8 +606,7 @@ public class SeedFormRestlet extends GWCRestlet {
             doc.append("<td>").append(tilesDoneStr).append("</td>");
             doc.append("<td>").append(timeSpent).append("</td>");
             doc.append("<td>").append(timeRemaining).append("</td>");
-            doc.append("<td>(Task ").append(task.getThreadOffset() + 1).append(" of ")
-                    .append(task.getJob().getThreadCount()).append(") </td>");
+            doc.append("<td>").append(task.getJob().getThreadCount()).append("</td>");
             doc.append("<td>").append(makeThreadKillForm(task.getTaskId(), tl)).append("</td>");
             doc.append("<tr>");
         }
