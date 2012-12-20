@@ -133,6 +133,7 @@ public class ThreadedSeedJob extends ThreadedJob implements SeedJob  {
         if (tRequest.failures < tileFailureRetryCount) {
             // Try again
             tRequest.retryAt=System.currentTimeMillis()+tileFailureRetryWaitTime;
+            tRequest.failures+=1;
             retry.add(tRequest);
             log.trace("Waiting " + tileFailureRetryWaitTime
                     + " before trying again");
