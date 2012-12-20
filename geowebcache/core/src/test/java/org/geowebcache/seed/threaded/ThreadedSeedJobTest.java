@@ -49,6 +49,8 @@ import org.geowebcache.layer.TileResponseReceiver;
 import org.geowebcache.layer.wms.WMSLayer;
 import org.geowebcache.layer.wms.WMSMetaTile;
 import org.geowebcache.layer.wms.WMSSourceHelper;
+import org.geowebcache.seed.GWCTask;
+import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.SeedRequest;
 import org.geowebcache.seed.SeedTask;
 import org.geowebcache.seed.GWCTask.TYPE;
@@ -163,6 +165,13 @@ public class ThreadedSeedJobTest extends TestCase {
         // WMSSourceHelper that on makeRequest() returns always the saqme fake image
         // WMSSourceHelper mockSourceHelper = new MockWMSSourceHelper();///
         // EasyMock.createMock(WMSSourceHelper.class);
+
+        reset(breeder);
+        expect(breeder.getStorageBroker()).andReturn(storageBroker).anyTimes();
+        breeder.setTaskState((GWCTask)anyObject(), eq(STATE.DEAD));
+        expectLastCall().anyTimes();
+        replay(breeder);
+        
         WMSSourceHelper mockSourceHelper = new MockWMSSourceHelper() {
             private int numCalls;
 
