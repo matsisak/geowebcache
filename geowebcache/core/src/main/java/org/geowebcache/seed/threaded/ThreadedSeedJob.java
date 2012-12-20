@@ -63,7 +63,7 @@ public class ThreadedSeedJob extends ThreadedJob implements SeedJob  {
             } else {
                 // There's a request in the retry queue
                 
-                long delay = System.currentTimeMillis() - request.retryAt;
+                long delay = request.retryAt - System.currentTimeMillis();
                 
                 if (delay>0) {
                     // It's not time for this request yet.

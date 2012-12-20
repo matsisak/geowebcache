@@ -327,6 +327,7 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         
         expect(tri.nextMetaGridLocation()).andReturn(new long[] {1,2,3});
         expect(tri.nextMetaGridLocation()).andReturn(new long[] {4,5,6});
+        expect(tri.nextMetaGridLocation()).andReturn(new long[] {7,8,9});
         expect(tri.nextMetaGridLocation()).andReturn(null).anyTimes();
         replay(tri);
         
@@ -341,7 +342,7 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         assertEquals(0, tr.getFailures());
         
         job.failure(task, tr, new RuntimeException("Just a test"));
-        Thread.sleep(10); // Make sure we give it time to get through the queue.
+        Thread.sleep(1500); // Make sure we give it time to get through the queue.
         
         tr = job.getNextLocation();
         assertTileRequestAt(tr, new long[] {1,2,3});
@@ -350,6 +351,18 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         tr = job.getNextLocation();
         assertTileRequestAt(tr, new long[] {4,5,6});
         assertEquals(0, tr.getFailures());
+        
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        // Don't sleep this time
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {7,8,9}); // Failed tile shouldn't have made it through yet so it should get a new one
+        assertEquals(0, tr.getFailures());
+        
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {4,5,6}); // Call should block and then return the failed
+        assertEquals(1, tr.getFailures());
         
         tr = job.getNextLocation();
         assertNull(tr);
@@ -365,7 +378,7 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         replay(breeder);
         TileLayer tl = createMock(TileLayer.class);
         replay(tl);
-        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, false, tri, tl, 1,10,4, false);
+        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, false, tri, tl, 1,750,4, false);
         
         GWCTask task = createMock(GWCTask.class);
         expect(task.getJob()).andReturn(job).anyTimes();
