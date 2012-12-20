@@ -70,5 +70,15 @@ public interface Job {
      */
     public TileRange getRange();
 
-    public abstract JobStatus getStatus();
+    /**
+     * Get a report of the status of the job
+     * @return
+     */
+    public JobStatus getStatus();
+    
+    /**
+     * Get the current state of the job, based on the states of its respective tasks.
+     * @return
+     */
+    public GWCTask.STATE getState();
 }

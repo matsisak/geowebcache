@@ -11,6 +11,7 @@ import org.apache.commons.logging.LogFactory;
 import org.geowebcache.filter.request.RequestFilter;
 import org.geowebcache.layer.TileLayer;
 import org.geowebcache.seed.GWCTask;
+import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.Job;
 import org.geowebcache.seed.JobStatus;
 import org.geowebcache.seed.TaskStatus;
@@ -219,4 +220,38 @@ abstract class ThreadedJob implements Job {
         }
         return new JobStatus(taskStatuses, System.currentTimeMillis(), this.id);
     }
+
+    public STATE getState() {
+        boolean allReadyUnset = true; // No tasks that aren't READY or UNSET have been seen
+        boolean running = false; // At least one running task has been seen
+        for(GWCTask task: threads){
+            switch(task.getState()){
+            case DEAD:
+                return STATE.DEAD; // TODO not sure this is right, maybe it should only be if all are DEAD.
+            case DONE:
+                allReadyUnset = false;
+                break;
+            case READY:
+                break;
+            case RUNNING:
+                allReadyUnset = false;
+                running = true;
+                break;
+            default:
+                break;
+            }
+        }
+        // None are dead, some are running, so the job is running
+        if(running) {
+            return STATE.RUNNING;
+        }
+        // All are Ready/Unset
+        if(allReadyUnset) {
+            return STATE.READY;
+        }
+        // Some are Done, any others are Ready/Unset
+        return STATE.DONE;
+    }
+    
+    
 }
