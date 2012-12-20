@@ -85,7 +85,7 @@ abstract class ThreadedJob implements Job {
 
     
     public TileRequest getNextLocation() throws InterruptedException {
-        long gridLoc[] = tri.nextMetaGridLocation(new long[3]);
+        long gridLoc[] = tri.nextMetaGridLocation();
         if (gridLoc == null) return null;  // We're done
         return new ThreadedTileRequest(gridLoc[0], gridLoc[1], gridLoc[2]);
     }

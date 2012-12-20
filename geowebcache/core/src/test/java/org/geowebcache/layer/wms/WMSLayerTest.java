@@ -180,7 +180,7 @@ public class WMSLayerTest extends TestCase {
         // define the meta tile size to 1,1 so we hit all the tiles
         final TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
-        long[] gridLoc = trIter.nextMetaGridLocation(new long[3]);
+        long[] gridLoc = trIter.nextMetaGridLocation();
 
         while (gridLoc != null) {
             Map<String, String> fullParameters = tr.getParameters();
@@ -191,7 +191,7 @@ public class WMSLayerTest extends TestCase {
             
             tl.seedTile(tile, false);
 
-            gridLoc = trIter.nextMetaGridLocation(gridLoc);
+            gridLoc = trIter.nextMetaGridLocation();
         }
     }
 
@@ -200,7 +200,7 @@ public class WMSLayerTest extends TestCase {
         // define the meta tile size to 1,1 so we hit all the tiles
         final TileRangeIterator trIter = new TileRangeIterator(tr, new int[]{1, 1});
 
-        long[] gridLoc = trIter.nextMetaGridLocation(new long[3]);
+        long[] gridLoc = trIter.nextMetaGridLocation();
 
         // six concurrent requests max
         ExecutorService requests = Executors.newFixedThreadPool(6);
@@ -223,7 +223,7 @@ public class WMSLayerTest extends TestCase {
                 }
             }));
 
-            gridLoc = trIter.nextMetaGridLocation(gridLoc);
+            gridLoc = trIter.nextMetaGridLocation();
         }
         
         // these assertions could be externalized

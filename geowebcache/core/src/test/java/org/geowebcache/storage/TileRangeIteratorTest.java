@@ -239,7 +239,7 @@ public class TileRangeIteratorTest extends TestCase {
         public Long call() throws Exception {
             long nprocessed = 0;
             long[] gridLoc = new long[3];
-            while (null != (gridLoc = tri.nextMetaGridLocation(gridLoc))) {
+            while (null != (gridLoc = tri.nextMetaGridLocation())) {
                 ++nprocessed;
             }
             return Long.valueOf(nprocessed);

@@ -70,14 +70,10 @@ public class TileRangeIterator {
      * If the TileRange object provided is a DiscontinuousTileRange implementation, each location is
      * checked against the filter of that class.
      * 
-     * @param gridLoc as an optimization, re-use the previous gridLoc.  It will be changed and used
-     * as the return value.  The values passed in will not impact the result.  For the first call, 
-     * use a new 3 element array.
-     * 
      * @return {@code null} if there're no more tiles to return, the next grid location in the
      *         iterator otherwise. The array has three elements: {x,y,z}
      */
-    public synchronized long[] nextMetaGridLocation(final long[] gridLoc) {
+    public synchronized long[] nextMetaGridLocation() {
         long[] levelBounds;
         long x;
         long y;
@@ -101,7 +97,7 @@ public class TileRangeIterator {
         for (; z <= tr.getZoomStop(); z++) {
             for (; y <= levelBounds[3]; y += metaY) {
                 for (; x <= levelBounds[2]; x += metaX) {
-
+                    long[] gridLoc = new long[3];
                     gridLoc[0] = x;
                     gridLoc[1] = y;
                     gridLoc[2] = z;
