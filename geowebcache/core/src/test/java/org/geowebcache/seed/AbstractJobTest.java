@@ -209,7 +209,7 @@ public void testTerminate() throws Exception {
         reset(task);
         
         expect(task.getState()).andReturn(s).anyTimes();
-        if(s == STATE.RUNNING || s == STATE.READY|| s == STATE.UNSET){
+        if(s != STATE.DEAD && s != STATE.DONE){
             task.terminateNicely();
             expectLastCall().once();
         }
