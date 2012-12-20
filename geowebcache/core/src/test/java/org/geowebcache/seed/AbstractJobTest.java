@@ -1,6 +1,9 @@
 package org.geowebcache.seed;
 
 import static org.easymock.classextension.EasyMock.*;
+
+import java.lang.Thread.State;
+
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.Job;
 import org.geowebcache.storage.TileRangeIterator;
@@ -60,7 +63,7 @@ public void testGetNextRequest() throws Exception {
 }
 
 /**
- * Return a Job with mock GWCTasks that report the given states when their getState methods are called.
+ * Return a Job with EasyMock GWCTasks that report the given states when their getState methods are called.
  * @param states
  * @return
  */
@@ -192,6 +195,32 @@ public void testGetStateDead() throws Exception {
  */
 public void testGetStateUnset() throws Exception {
     // This is never expected
+}
+
+/**
+ * Test the terminate method
+ * @throws Exception
+ */
+public void testTerminate() throws Exception {
+    Job job = jobWithTaskStates(STATE.DONE, STATE.RUNNING, STATE.RUNNING, STATE.UNSET, STATE.READY);
+    
+    for(GWCTask task: job.getTasks()){
+        STATE s = task.getState();
+        reset(task);
+        
+        expect(task.getState()).andReturn(s).anyTimes();
+        if(s == STATE.RUNNING || s == STATE.READY|| s == STATE.UNSET){
+            task.terminateNicely();
+            expectLastCall().once();
+        }
+        replay(task);
+    }
+    
+    job.terminate();
+    
+    for(GWCTask task: job.getTasks()){
+        verify(task);
+    }
 }
 
 }

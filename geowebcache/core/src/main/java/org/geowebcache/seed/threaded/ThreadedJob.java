@@ -222,6 +222,7 @@ abstract class ThreadedJob implements Job {
     }
 
     public STATE getState() {
+        Assert.state(threads.length>0, "Job should have at least one task.");
         boolean allReadyUnset = true; // No tasks that aren't READY or UNSET have been seen
         boolean running = false; // At least one running task has been seen
         for(GWCTask task: threads){
