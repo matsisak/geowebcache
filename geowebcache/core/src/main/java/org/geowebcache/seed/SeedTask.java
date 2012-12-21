@@ -86,7 +86,7 @@ public class SeedTask extends GWCTask {
 
         long seedCalls = 0;
         TileRequest request = null;
-        while ((request = parentJob.getNextLocation()) != null && this.terminate == false) {
+        while (this.terminate == false && (request = parentJob.getNextLocation()) != null) {
 
             checkInterrupted();
             Map<String, String> fullParameters = tr.getParameters();
