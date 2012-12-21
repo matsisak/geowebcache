@@ -28,6 +28,11 @@ import org.springframework.util.Assert;
  */
 public abstract class GWCTask {
 
+    /**
+     * An unknown duration
+     */
+    static final long TIME_UNKNOWN = -2;
+
     @SuppressWarnings("unused")
     private static final Log log = LogFactory.getLog(GWCTask.class);
 
@@ -64,16 +69,22 @@ public abstract class GWCTask {
     //private long groupStartTime;
 
     
-    
+    /**
+     * Create a new GWCTask.  Should only be called by implementations of {@link Job}.
+     * @param taskId unique ID for the job
+     * @param parentJob the job this task belongs to
+     * @param parsedType the type of the job
+     */
     public GWCTask(long taskId, Job parentJob, TYPE parsedType) {
         super();
         this.taskId = taskId;
         this.parentJob = parentJob;
         this.parsedType = parsedType;
     }
+    
     /**
-     * Marks this task as active in the group by incrementing the shared counter, delegates to
-     * {@link #doActionInternal()}, and makes sure to remove this task from the group count.
+     * Marks this task as active in the Job, delegates to {@link #doActionInternal()}, and notifies
+     * the Job when it stops.
      */
     public final void doAction() throws GeoWebCacheException, InterruptedException {
         Assert.state(this.state==STATE.READY, "Task can not be started as it is "+state+" rather than READY");
@@ -94,7 +105,7 @@ public abstract class GWCTask {
 
 
     /**
-     * Called when task completes
+     * Called when task completes, successfully or unsuccessfully
      */
     protected abstract void dispose();
 
@@ -107,10 +118,18 @@ public abstract class GWCTask {
         return taskId;
     }
 
+    /**
+     * Get the job this task belongs to.
+     * @return
+     */
     public Job getJob() {
         return parentJob;
     }
 
+    /**
+     * Get the name of the layer this task is working on
+     * @return
+     */
     public String getLayerName() {
         return parentJob.getLayer().getName();
     }
@@ -122,18 +141,22 @@ public abstract class GWCTask {
         return tilesTotal;
     }
 
+    /**
+     * Get the number of tiles this task has processed
+     * @return
+     */
     public long getTilesDone() {
         return tilesDone;
     }
 
     /**
-     * @return estimated remaining time in seconds, or {@code -2} if unknown
+     * @return estimated remaining time in seconds, or {@code TIME_UNKNOWN} if unknown
      */
     public long getTimeRemaining() {
         if (tilesTotal > 0) {
             return timeRemaining;
         } else {
-            return -2;
+            return TIME_UNKNOWN;
         }
     }
 
@@ -144,18 +167,33 @@ public abstract class GWCTask {
         return timeSpent;
     }
 
+    /**
+     * Terminate this task
+     */
     public void terminateNicely() {
         this.terminate = true;
     }
 
+    /**
+     * Get the type of this task
+     * @return
+     */
     public TYPE getType() {
         return parsedType;
     }
 
+    /**
+     * Get the current state of this task
+     * @return
+     */
     public STATE getState() {
         return state;
     }
 
+    /**
+     * Check if the thread was interrupted and handle it if so.
+     * @throws InterruptedException if the thread was interrupted
+     */
     protected void checkInterrupted() throws InterruptedException {
         if (Thread.interrupted()) {
             this.state = STATE.DEAD;
@@ -171,6 +209,10 @@ public abstract class GWCTask {
                 .toString();
     }
     
+    /**
+     * Get a report on the status of the task.
+     * @return
+     */
     public TaskStatus getStatus(){
        return new TaskStatus(
                 System.currentTimeMillis(),
