@@ -1,5 +1,6 @@
 package org.geowebcache.seed.threaded;
 
+import org.easymock.classextension.EasyMock;
 import org.geowebcache.TestHelpers;
 import org.geowebcache.grid.GridSubset;
 import org.geowebcache.layer.TileLayer;
@@ -11,6 +12,7 @@ import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.GWCTask.TYPE;
 import org.geowebcache.seed.Job;
 import org.geowebcache.seed.SeedRequest;
+import org.geowebcache.seed.TruncateJob;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
 import org.geowebcache.storage.TileRange;
@@ -117,7 +119,8 @@ public void testSeedStoredTiles() throws Exception {
     replay(storageBroker);
     
     breeder = createMock(ThreadedTileBreeder.class);
-    expect(breeder.getStorageBroker()).andReturn(storageBroker).anyTimes();
+    expect(breeder.getStorageBroker()).andStubReturn(storageBroker);
+    expect(breeder.createTruncateTask(EasyMock.<TruncateJob>anyObject()));
     replay(breeder);
 
     ThreadedTruncateJob job = new ThreadedTruncateJob(1,breeder, trIter, tl, false);

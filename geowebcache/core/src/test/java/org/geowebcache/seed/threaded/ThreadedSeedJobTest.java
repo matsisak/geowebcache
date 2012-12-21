@@ -12,7 +12,7 @@
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * 
- * @author Gabriel Roldan, OpenGeo, Copyright 2010
+ * @author Kevin Smith, OpenGeo, Copyright 2012
  */
 package org.geowebcache.seed.threaded;
 
@@ -27,21 +27,12 @@ import static org.geowebcache.storage.TileObjectMatcher.tileObjectAt;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import junit.framework.TestCase;
 
 import org.easymock.Capture;
+import org.easymock.IAnswer;
 import org.easymock.classextension.EasyMock;
 import org.geowebcache.GeoWebCacheException;
-import org.geowebcache.TestHelpers;
-import org.geowebcache.grid.BoundingBox;
 import org.geowebcache.grid.GridSubset;
 import org.geowebcache.io.Resource;
 import org.geowebcache.layer.TileLayer;
@@ -376,21 +367,37 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         
         trDone = job.getNextLocation();
         assertNull(trDone);
+        assertEquals(3, job.getFailures());
     }
 
+    /**
+     * Create a mock task, and expect a call to the breeder's createSeedTask method returning the created task
+     * @param mockBreeder an EasyMock mock of a TileBreeder in its record phase
+     * @return a mock SeedTask in its record phase
+     */
+    private SeedTask createMockTask(ThreadedTileBreeder mockBreeder) {
+        final SeedTask task = createMock(SeedTask.class);
+        final Capture<SeedJob> jobCap = new Capture<SeedJob>();
+        expect(mockBreeder.createSeedTask(capture(jobCap))).andReturn(task).once();
+        expect(task.getJob()).andStubAnswer(new IAnswer<SeedJob>(){
+            // The task should report that it belongs to the captured job
+            public SeedJob answer() throws Throwable {
+                return jobCap.getValue();
+            }
+
+        });
+        return task;
+    }
     
     @Override
     protected Job initNextLocation(TileRangeIterator tri) {
         ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+        final SeedTask task = createMockTask(breeder);
+        replay(task);
         replay(breeder);
         TileLayer tl = createMock(TileLayer.class);
         replay(tl);
         ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, false, tri, tl, 2,750,4, false);
-        
-        GWCTask task = createMock(GWCTask.class);
-        expect(task.getJob()).andReturn(job).anyTimes();
-        replay(task);
-        job.threads[0] = task;
 
         return job;
     }
@@ -398,6 +405,11 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
     @Override
     protected Job jobWithTaskStates(STATE... states) {
         ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+        for(int i=0; i<states.length; i++){
+            final SeedTask task = createMockTask(breeder);
+            expect(task.getState()).andStubReturn(states[i]); // Have the task report itself as being in the desired state
+            replay(task);
+        }            
         replay(breeder);
         TileLayer tl = createMock(TileLayer.class);
         replay(tl);
@@ -405,15 +417,6 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         replay(tri);
         
         ThreadedSeedJob job = new ThreadedSeedJob(1,states.length, breeder, false, tri, tl, 1,1,4, false);
-        
-        // Replace the threads with mocks.
-        for(int i=0; i<states.length; i++){
-            GWCTask task = createMock(GWCTask.class);
-            expect(task.getState()).andReturn(states[i]).anyTimes();
-            expect(task.getJob()).andReturn(job).anyTimes();
-            replay(task);
-            job.threads[i] = task;
-        }
         
         return job;
     }
