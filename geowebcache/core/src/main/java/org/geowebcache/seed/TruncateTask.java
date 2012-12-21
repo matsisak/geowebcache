@@ -24,7 +24,7 @@ public class TruncateTask extends GWCTask {
     private static Log log = LogFactory.getLog(TruncateTask.class);
 
 
-    public TruncateTask(long taskId, TruncateJob job) {
+    TruncateTask(long taskId, TruncateJob job) {
         super(taskId, job, GWCTask.TYPE.TRUNCATE);
         this.state=STATE.READY;
     }

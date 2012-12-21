@@ -5,7 +5,6 @@ import org.geowebcache.layer.TileLayer;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.TruncateJob;
 import org.geowebcache.storage.TileRangeIterator;
-import org.geowebcache.seed.TruncateTask;
 
 public class ThreadedTruncateJob extends ThreadedJob implements TruncateJob {
 
@@ -14,7 +13,7 @@ public class ThreadedTruncateJob extends ThreadedJob implements TruncateJob {
         super(id, breeder, tl, 1, tri, doFilterUpdates);
         
         threads = new GWCTask[1];
-        threads[0] = new TruncateTask(-1, this);
+        threads[0] = breeder.createTruncateTask(this);
     }
 
     public void runSynchronously() throws GeoWebCacheException,

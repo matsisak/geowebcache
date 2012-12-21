@@ -51,12 +51,16 @@ import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.Job;
 import org.geowebcache.seed.JobStatus;
+import org.geowebcache.seed.SeedJob;
 import org.geowebcache.seed.SeedRequest;
+import org.geowebcache.seed.SeedTask;
 import org.geowebcache.seed.SeederThreadPoolExecutor;
 import org.geowebcache.seed.TaskStatus;
 import org.geowebcache.seed.TileBreeder;
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.GWCTask.TYPE;
+import org.geowebcache.seed.TruncateJob;
+import org.geowebcache.seed.TruncateTask;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileRange;
 import org.geowebcache.storage.TileRangeIterator;
@@ -610,12 +614,23 @@ public class ThreadedTileBreeder extends TileBreeder implements ApplicationConte
         return this.layerDispatcher.getLayerList();
     }
 
-    long getNextTaskId() {
+    protected long getNextTaskId() {
         return currentTaskId.getAndIncrement();
     }
     
     // Make visible to package.
+    @Override
     protected void setTaskState(GWCTask task, GWCTask.STATE state) {
         super.setTaskState(task, state);
+    }
+
+    @Override
+    protected SeedTask createSeedTask(SeedJob job) {
+        return super.createSeedTask(job);
+    }
+
+    @Override
+    protected TruncateTask createTruncateTask(TruncateJob job) {
+        return super.createTruncateTask(job);
     }
 }

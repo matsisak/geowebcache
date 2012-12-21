@@ -233,4 +233,28 @@ protected void setTaskState(GWCTask task, GWCTask.STATE state){
     task.state = state;
 }
 
+/**
+ * Returns a unique ID for a new task.
+ * @return
+ */
+protected abstract long getNextTaskId();
+
+/**
+ * Creates a new SeedTask for the specified Job
+ * @param job
+ * @return
+ */
+protected SeedTask createSeedTask(SeedJob job) {
+    return new SeedTask(getNextTaskId(), job);
+}
+
+/**
+ * Creates a new TruncateTask for the specified Job
+ * @param job
+ * @return
+ */
+protected TruncateTask createTruncateTask(TruncateJob job) {
+    return new TruncateTask(getNextTaskId(), job);
+}
+
 }

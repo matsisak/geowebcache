@@ -46,7 +46,7 @@ public class SeedTask extends GWCTask {
      * @param reseed
      * @param doFilterUpdate
      */
-    public SeedTask(long taskId, SeedJob job) {
+    SeedTask(long taskId, SeedJob job) {
         super(
                 taskId, job, 
                 job.isReseed() ? GWCTask.TYPE.RESEED: GWCTask.TYPE.SEED);

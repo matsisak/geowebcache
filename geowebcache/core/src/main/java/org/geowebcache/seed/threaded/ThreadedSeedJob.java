@@ -10,9 +10,7 @@ import org.geowebcache.GeoWebCacheException;
 import org.geowebcache.layer.TileLayer;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.SeedJob;
-import org.geowebcache.seed.SeedTask;
 import org.geowebcache.seed.TileRequest;
-import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.storage.TileRangeIterator;
 import org.springframework.util.Assert;
 
@@ -43,7 +41,7 @@ public class ThreadedSeedJob extends ThreadedJob implements SeedJob  {
         threads = new GWCTask[threadCount];
         
         for (int i=0; i<threadCount; i++){
-            threads[i] = new SeedTask(-1, this);
+            threads[i] = breeder.createSeedTask(this);
         }
     }
         
