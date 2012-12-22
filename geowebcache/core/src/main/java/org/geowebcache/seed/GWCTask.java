@@ -21,12 +21,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.geowebcache.GeoWebCacheException;
+import org.springframework.util.Assert;
 
 /**
  * 
  */
 public abstract class GWCTask {
 
+    /**
+     * An unknown duration
+     */
+    static final long TIME_UNKNOWN = -2;
+
+    @SuppressWarnings("unused")
     private static final Log log = LogFactory.getLog(GWCTask.class);
 
     public static enum TYPE {
@@ -37,21 +44,17 @@ public abstract class GWCTask {
         UNSET, READY, RUNNING, DONE, DEAD
     };
 
-    /**
-     * Value shared between all the threads in the group, is incremented each time a task starts
-     * working and decremented each time one task finishes (either normally or abnormally)
-     */
-    protected AtomicInteger sharedThreadCount = new AtomicInteger();
+    //protected int threadOffset = 0;
 
-    protected int threadOffset = 0;
+    protected final Job parentJob;
+    
+    protected final long taskId;
 
-    long taskId = -1;
-
-    protected TYPE parsedType = TYPE.UNSET;
+    protected final TYPE parsedType; // = TYPE.UNSET; // TODO Do we need the UNSET type?
 
     protected STATE state = STATE.UNSET;
 
-    protected String layerName = null;
+    // protected final String layerName;
 
     protected long timeSpent = -1;
 
@@ -62,29 +65,48 @@ public abstract class GWCTask {
     protected long tilesTotal = -1;
 
     protected boolean terminate = false;
+    
+    //private long groupStartTime;
 
-    private long groupStartTime;
-
+    
     /**
-     * Marks this task as active in the group by incrementing the shared counter, delegates to
-     * {@link #doActionInternal()}, and makes sure to remove this task from the group count.
+     * Create a new GWCTask.  Should only be called by implementations of {@link Job}.
+     * @param taskId unique ID for the job
+     * @param parentJob the job this task belongs to
+     * @param parsedType the type of the job
+     */
+    public GWCTask(long taskId, Job parentJob, TYPE parsedType) {
+        super();
+        this.taskId = taskId;
+        this.parentJob = parentJob;
+        this.parsedType = parsedType;
+    }
+    
+    /**
+     * Marks this task as active in the Job, delegates to {@link #doActionInternal()}, and notifies
+     * the Job when it stops.
      */
     public final void doAction() throws GeoWebCacheException, InterruptedException {
-        this.sharedThreadCount.incrementAndGet();
-        this.groupStartTime = System.currentTimeMillis();
+        Assert.state(this.state==STATE.READY, "Task can not be started as it is "+state+" rather than READY");
+        state=STATE.RUNNING;
+        parentJob.threadStarted(this);
         try {
             doActionInternal();
         } finally {
-            dispose();
-            int membersRemaining = this.sharedThreadCount.decrementAndGet();
-            if (0 == membersRemaining) {
-                double groupTotalTimeSecs = (System.currentTimeMillis() - (double) groupStartTime) / 1000;
-                log.info("Thread group finished " + parsedType + " task after "
-                        + groupTotalTimeSecs + " seconds");
+            // If it's not DONE, it's DEAD at this point.
+            if(state!=STATE.DONE && state!=STATE.DEAD){
+                log.info("Task "+Long.toString(taskId)+"reached end but was still in state "+state+".  Setting to DEAD.");
+                state=STATE.DEAD;
             }
+            dispose();
+            parentJob.threadStopped(this);
         }
     }
 
+
+    /**
+     * Called when task completes, successfully or unsuccessfully
+     */
     protected abstract void dispose();
 
     /**
@@ -92,36 +114,24 @@ public abstract class GWCTask {
      */
     protected abstract void doActionInternal() throws GeoWebCacheException, InterruptedException;
 
-    /**
-     * @param sharedThreadCount
-     *            a counter of number of active tasks in the task group, incremented when this task
-     *            starts working and decremented when it stops
-     * @param threadOffset
-     *            REVISIT: may not be needed anymore. Just check if sharedThreadCount == 1?
-     */
-    public void setThreadInfo(AtomicInteger sharedThreadCount, int threadOffset) {
-        this.sharedThreadCount = sharedThreadCount;
-        this.threadOffset = threadOffset;
-    }
-
-    public void setTaskId(long taskId) {
-        this.taskId = taskId;
-    }
-
     public long getTaskId() {
         return taskId;
     }
 
-    public int getThreadCount() {
-        return sharedThreadCount.get();
+    /**
+     * Get the job this task belongs to.
+     * @return
+     */
+    public Job getJob() {
+        return parentJob;
     }
 
-    public int getThreadOffset() {
-        return threadOffset;
-    }
-
+    /**
+     * Get the name of the layer this task is working on
+     * @return
+     */
     public String getLayerName() {
-        return layerName;
+        return parentJob.getLayer().getName();
     }
 
     /**
@@ -131,18 +141,22 @@ public abstract class GWCTask {
         return tilesTotal;
     }
 
+    /**
+     * Get the number of tiles this task has processed
+     * @return
+     */
     public long getTilesDone() {
         return tilesDone;
     }
 
     /**
-     * @return estimated remaining time in seconds, or {@code -2} if unknown
+     * @return estimated remaining time in seconds, or {@code TIME_UNKNOWN} if unknown
      */
     public long getTimeRemaining() {
         if (tilesTotal > 0) {
             return timeRemaining;
         } else {
-            return -2;
+            return TIME_UNKNOWN;
         }
     }
 
@@ -153,21 +167,37 @@ public abstract class GWCTask {
         return timeSpent;
     }
 
+    /**
+     * Terminate this task
+     */
     public void terminateNicely() {
         this.terminate = true;
     }
 
+    /**
+     * Get the type of this task
+     * @return
+     */
     public TYPE getType() {
         return parsedType;
     }
 
+    /**
+     * Get the current state of this task
+     * @return
+     */
     public STATE getState() {
         return state;
     }
 
+    /**
+     * Check if the thread was interrupted and handle it if so.
+     * @throws InterruptedException if the thread was interrupted
+     */
     protected void checkInterrupted() throws InterruptedException {
         if (Thread.interrupted()) {
             this.state = STATE.DEAD;
+            parentJob.threadStopped(this);
             throw new InterruptedException();
         }
     }
@@ -177,5 +207,20 @@ public abstract class GWCTask {
         return new StringBuilder("[").append(getTaskId()).append(": ").append(getLayerName())
                 .append(", ").append(getType()).append(", ").append(getState()).append("]")
                 .toString();
+    }
+    
+    /**
+     * Get a report on the status of the task.
+     * @return
+     */
+    public TaskStatus getStatus(){
+       return new TaskStatus(
+                System.currentTimeMillis(),
+                getTilesDone(),
+                getTilesTotal(),
+                getTimeRemaining(),
+                getTaskId(),
+                getState()
+                );
     }
 }

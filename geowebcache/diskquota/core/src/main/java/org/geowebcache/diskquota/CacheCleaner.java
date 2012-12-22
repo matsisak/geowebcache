@@ -31,6 +31,7 @@ import org.geowebcache.mime.MimeException;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.TileBreeder;
+import org.geowebcache.seed.TruncateJob;
 import org.geowebcache.storage.TileRange;
 import org.springframework.beans.factory.DisposableBean;
 
@@ -224,12 +225,12 @@ public class CacheCleaner implements DisposableBean {
                 log.trace("Expiring page " + tilePage + "/" + mimeType.getFormat());
             }
         }
-        GWCTask truncateTask = createTruncateTaskForPage(layerName, gridSetId, zoomLevel,
+        TruncateJob job = (TruncateJob) createTruncateTaskForPage(layerName, gridSetId, zoomLevel,
                 pageGridCoverage, mimeType, parametersId);
 
         // truncate synchronously. We're already inside the interested thread
         try {
-            truncateTask.doAction();
+            job.runSynchronously();
             pageStore.setTruncated(tilePage);
         } catch (InterruptedException e) {
             log.debug("Truncate task interrupted");
@@ -240,7 +241,7 @@ public class CacheCleaner implements DisposableBean {
     }
 
     // FRD , Long parameterId
-    private GWCTask createTruncateTaskForPage(final String layerName, String gridSetId,
+    private TruncateJob createTruncateTaskForPage(final String layerName, String gridSetId,
             int zoomLevel, long[][] pageGridCoverage, MimeType mimeType, String parametersId) {
         TileRange tileRange;
         {
@@ -253,16 +254,15 @@ public class CacheCleaner implements DisposableBean {
         }
 
         boolean filterUpdate = false;
-        GWCTask[] truncateTasks;
+        TruncateJob job;
         try {
-            truncateTasks = this.tileBreeder.createTasks(tileRange, GWCTask.TYPE.TRUNCATE, 1,
+            job = (TruncateJob) this.tileBreeder.createJob(tileRange, GWCTask.TYPE.TRUNCATE, 1,
                     filterUpdate);
         } catch (GeoWebCacheException e) {
             throw new RuntimeException(e);
         }
-        GWCTask truncateTask = truncateTasks[0];
 
-        return truncateTask;
+        return job;
     }
 
 }

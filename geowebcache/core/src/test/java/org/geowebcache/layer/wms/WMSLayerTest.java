@@ -50,7 +50,7 @@ import org.geowebcache.io.Resource;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.SeedRequest;
-import org.geowebcache.seed.TileBreeder;
+import org.geowebcache.seed.threaded.ThreadedTileBreeder;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
 import org.geowebcache.storage.TileRange;
@@ -125,7 +125,7 @@ public class WMSLayerTest extends TestCase {
         MockTileSupport mock = new MockTileSupport(tl);
 
         SeedRequest req = createRequest(tl, GWCTask.TYPE.SEED, 4, 7);
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
         
         seedTiles(mock.storageBroker, tr, tl);
         
@@ -145,7 +145,7 @@ public class WMSLayerTest extends TestCase {
 
         // we're not really seeding, just using the range
         SeedRequest req = createRequest(tl, GWCTask.TYPE.SEED, 4, 7);
-        TileRange tr = TileBreeder.createTileRange(req, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
 
         List<ConveyorTile> tiles = getTiles(mock.storageBroker, tr, tl);
 
@@ -180,7 +180,7 @@ public class WMSLayerTest extends TestCase {
         // define the meta tile size to 1,1 so we hit all the tiles
         final TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
 
-        long[] gridLoc = trIter.nextMetaGridLocation(new long[3]);
+        long[] gridLoc = trIter.nextMetaGridLocation();
 
         while (gridLoc != null) {
             Map<String, String> fullParameters = tr.getParameters();
@@ -191,7 +191,7 @@ public class WMSLayerTest extends TestCase {
             
             tl.seedTile(tile, false);
 
-            gridLoc = trIter.nextMetaGridLocation(gridLoc);
+            gridLoc = trIter.nextMetaGridLocation();
         }
     }
 
@@ -200,7 +200,7 @@ public class WMSLayerTest extends TestCase {
         // define the meta tile size to 1,1 so we hit all the tiles
         final TileRangeIterator trIter = new TileRangeIterator(tr, new int[]{1, 1});
 
-        long[] gridLoc = trIter.nextMetaGridLocation(new long[3]);
+        long[] gridLoc = trIter.nextMetaGridLocation();
 
         // six concurrent requests max
         ExecutorService requests = Executors.newFixedThreadPool(6);
@@ -223,7 +223,7 @@ public class WMSLayerTest extends TestCase {
                 }
             }));
 
-            gridLoc = trIter.nextMetaGridLocation(gridLoc);
+            gridLoc = trIter.nextMetaGridLocation();
         }
         
         // these assertions could be externalized

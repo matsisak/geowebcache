@@ -171,4 +171,36 @@ public class TileRange {
         }
         return zlevelBounds;
     }
+
+    /**
+     * Count the number of tiles in the range
+     * 
+     * @return -1 if too many
+     */
+    public long tileCount() {
+    
+        final int startZoom = getZoomStart();
+        final int stopZoom = getZoomStop();
+    
+        long count = 0;
+    
+        for (int z = startZoom; z <= stopZoom; z++) {
+            long[] gridBounds = rangeBounds(z);
+    
+            final long minx = gridBounds[0];
+            final long maxx = gridBounds[2];
+            final long miny = gridBounds[1];
+            final long maxy = gridBounds[3];
+    
+            long thisLevel = (1 + maxx - minx) * (1 + maxy - miny);
+    
+            if (thisLevel > (Long.MAX_VALUE / 4) && z != stopZoom) {
+                return -1;
+            } else {
+                count += thisLevel;
+            }
+        }
+    
+        return count;
+    }
 }

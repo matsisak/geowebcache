@@ -38,7 +38,9 @@ import org.geowebcache.mime.MimeException;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.GWCTask.STATE;
+import org.geowebcache.seed.Job;
 import org.geowebcache.seed.TileBreeder;
+import org.geowebcache.seed.TruncateJob;
 import org.geowebcache.storage.DiscontinuousTileRange;
 import org.geowebcache.storage.GeometryRasterMaskBuilder;
 import org.geowebcache.storage.RasterMask;
@@ -271,8 +273,8 @@ class GeoRSSPollTask implements Runnable {
                     gridSub.getZoomStart(), gridSub.getZoomStop(), rasterMask, mimeIter.next(),
                     (Map<String, String>) null);
             try {
-                GWCTask[] tasks = seeder.createTasks(dtr, layer, GWCTask.TYPE.TRUNCATE, 1, false);
-                tasks[0].doAction();
+                TruncateJob job = (TruncateJob) seeder.createJob(dtr, layer, GWCTask.TYPE.TRUNCATE, 1, false);
+                job.runSynchronously();
             } catch (GeoWebCacheException e) {
                 logger.error("Problem truncating based on GeoRSS feed: " + e.getMessage());
             } catch (InterruptedException e) {
@@ -295,16 +297,16 @@ class GeoRSSPollTask implements Runnable {
                     (Map<String, String>) null);
 
             final int seedingThreads = pollDef.getSeedingThreads();
-            GWCTask[] tasks;
+            Job job;
             try {
-                tasks = seeder.createTasks(dtr, layer, GWCTask.TYPE.SEED, seedingThreads, false);
+                job = seeder.createJob(dtr, layer, GWCTask.TYPE.SEED, seedingThreads, false);
             } catch (GeoWebCacheException e) {
                 throw (RuntimeException) new RuntimeException(e.getMessage()).initCause(e);
             }
-            seeder.dispatchTasks(tasks);
+            seeder.dispatchJob(job);
 
             // Save the handles so we can stop them
-            for (GWCTask task : tasks) {
+            for (GWCTask task : job.getTasks()) {
                 seedTasks.add(task);
             }
 

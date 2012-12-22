@@ -44,6 +44,8 @@ import org.geowebcache.rest.RestletException;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.GWCTask.TYPE;
+import org.geowebcache.seed.threaded.ThreadedTileBreeder;
+import org.geowebcache.seed.Job;
 import org.geowebcache.seed.SeedRequest;
 import org.geowebcache.seed.TileBreeder;
 import org.geowebcache.storage.TileRange;
@@ -525,8 +527,86 @@ public class SeedFormRestlet extends GWCRestlet {
             doc.append("<td>").append(tilesDoneStr).append("</td>");
             doc.append("<td>").append(timeSpent).append("</td>");
             doc.append("<td>").append(timeRemaining).append("</td>");
-            doc.append("<td>(Task ").append(task.getThreadOffset() + 1).append(" of ")
-                    .append(task.getThreadCount()).append(") </td>");
+            doc.append("<td>").append(task.getJob().getThreadCount()).append("</td>");
+            doc.append("<td>").append(makeThreadKillForm(task.getTaskId(), tl)).append("</td>");
+            doc.append("<tr>");
+        }
+
+        if (tasks) {
+            doc.append("</table>");
+        }
+        doc.append("<p><a href=\"./" + layerName + "\">Refresh list</a></p>\n");
+    }
+
+    // TODO
+    private void makeJobList(StringBuilder doc, TileLayer tl, boolean listAll) {
+
+        doc.append(makeKillallThreadsForm(tl, listAll));
+
+        doc.append("<h4>List of currently executing Jobs:</h4>\n");
+
+        Iterator<GWCTask> iter = seeder.getRunningAndPendingTasks();
+
+        boolean tasks = false;
+        if (!iter.hasNext()) {
+            doc.append("<ul><li><i>none</i></li></ul>\n");
+        } else {
+            doc.append("<table border=\"0\">");
+            doc.append("<tr style=\"font-weight: bold;\"><td style=\"padding-right:20px;\">Id</td><td style=\"padding-right:20px;\">Layer</td><td style=\"padding-right:20px;\">Status</td><td style=\"padding-right:20px;\">Type</td><td>Estimated # of tiles</td>"
+                    + "<td style=\"padding-right:20px;\">Tiles completed</td><td style=\"padding-right:20px;\">Time elapsed</td><td>Time remaining</td><td>Tasks</td><td>&nbsp;</td>");
+            doc.append("</tr>");
+            tasks = true;
+        }
+
+        int row = 0;
+
+        final String layerName = tl.getName();
+        while (iter.hasNext()) {
+            GWCTask task = iter.next();
+            if (!listAll && !layerName.equals(task.getLayerName())) {
+                continue;
+            }
+            final long spent = task.getTimeSpent();
+            final long remining = task.getTimeRemaining();
+            final long tilesDone = task.getTilesDone();
+            final long tilesTotal = task.getTilesTotal();
+
+            NumberFormat nf = NumberFormat.getInstance(Locale.ENGLISH);
+            nf.setGroupingUsed(true);
+            final String tilesTotalStr;
+            if (tilesTotal < 0) {
+                tilesTotalStr = "Too many to count";
+            } else {
+                tilesTotalStr = nf.format(tilesTotal);
+            }
+            final String tilesDoneStr = nf.format(task.getTilesDone());
+            final STATE state = task.getState();
+
+            final String status = STATE.UNSET.equals(state) || STATE.READY.equals(state) ? "PENDING"
+                    : state.toString();
+
+            String timeSpent = toTimeString(spent, tilesDone, tilesTotal);
+            String timeRemaining = toTimeString(remining, tilesDone, tilesTotal);
+
+            String bgColor = ++row % 2 == 0 ? "#FFFFFF" : "#DDDDDD";
+            doc.append("<tr style=\"background-color:" + bgColor + ";\">");
+            doc.append("<td style=\"text-align:right\">").append(task.getTaskId()).append("</td>");
+            doc.append("<td>");
+            if (!layerName.equals(task.getLayerName())) {
+                doc.append("<a href=\"./").append(task.getLayerName()).append("\">");
+            }
+            doc.append(task.getLayerName());
+            if (!layerName.equals(task.getLayerName())) {
+                doc.append("</a>");
+            }
+            doc.append("</td>");
+            doc.append("<td>").append(status).append("</td>");
+            doc.append("<td>").append(task.getType()).append("</td>");
+            doc.append("<td>").append(tilesTotalStr).append("</td>");
+            doc.append("<td>").append(tilesDoneStr).append("</td>");
+            doc.append("<td>").append(timeSpent).append("</td>");
+            doc.append("<td>").append(timeRemaining).append("</td>");
+            doc.append("<td>").append(task.getJob().getThreadCount()).append("</td>");
             doc.append("<td>").append(makeThreadKillForm(task.getTaskId(), tl)).append("</td>");
             doc.append("<tr>");
         }
@@ -756,17 +836,17 @@ public class SeedFormRestlet extends GWCRestlet {
         SeedRequest sr = new SeedRequest(layerName, bounds, gridSetId, threadCount, zoomStart,
                 zoomStop, format, type, fullParameters);
 
-        TileRange tr = TileBreeder.createTileRange(sr, tl);
+        TileRange tr = ThreadedTileBreeder.createTileRange(sr, tl);
 
-        GWCTask[] tasks;
+        Job job;
         try {
-            tasks = seeder.createTasks(tr, tl, sr.getType(), sr.getThreadCount(),
+            job = seeder.createJob(tr, tl, sr.getType(), sr.getThreadCount(),
                     sr.getFilterUpdate());
         } catch (GeoWebCacheException e) {
             throw new RestletException(e.getMessage(), Status.SERVER_ERROR_INTERNAL);
         }
 
-        seeder.dispatchTasks(tasks);
+        seeder.dispatchJob(job);
 
         // Give the thread executor a chance to run
         try {

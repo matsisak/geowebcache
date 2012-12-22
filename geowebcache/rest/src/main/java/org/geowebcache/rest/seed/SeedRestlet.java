@@ -22,6 +22,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.util.Collection;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,6 +33,7 @@ import org.geowebcache.rest.GWCRestlet;
 import org.geowebcache.rest.RestletException;
 import org.geowebcache.seed.SeedRequest;
 import org.geowebcache.seed.TileBreeder;
+import org.geowebcache.seed.TaskStatus;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
@@ -99,16 +101,16 @@ public class SeedRestlet extends GWCRestlet {
         try {
             XStream xs = new XStream(new JsonHierarchicalStreamDriver());
             JSONObject obj = null;
-            long[][] list;
+            Collection<TaskStatus> list;
             if (null == layerName) {
-                list = seeder.getStatusList();
+                list = seeder.getTaskStatusList();
             } else {
                 try {
                     seeder.findTileLayer(layerName);
                 } catch (GeoWebCacheException e) {
                     throw new RestletException(e.getMessage(), Status.CLIENT_ERROR_BAD_REQUEST);
                 }
-                list = seeder.getStatusList(layerName);
+                list = seeder.getTaskStatusList(layerName);
             }
             obj = new JSONObject(xs.toXML(list));
 
