@@ -97,6 +97,11 @@
 				<artifactId>gwc-arcgiscache</artifactId>
 				<version>${gwc-version}</version>
 			</dependency>
+            <dependency>
+                <groupId>org.geowebcache</groupId>
+                <artifactId>gwc-web</artifactId>
+                <version>${gwc-version}</version>
+            </dependency>
 
 
 		</dependencies>
