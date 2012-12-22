@@ -116,22 +116,22 @@ public class ThreadedSeedJob extends ThreadedJob implements SeedJob  {
             
         if( failureCount.incrementAndGet() >= totalFailuresBeforeAborting ){
             // Too many failures, kill the task.
-            // TODO: kill the entire job properly.
-            log.info("Aborting seed thread " + Thread.currentThread().getName()
+            log.info("Aborting seed job " + Thread.currentThread().getName()
                     + ". Error count reached configured maximum of "
                     + totalFailuresBeforeAborting);
-            breeder.setTaskState(task, GWCTask.STATE.DEAD);
+            terminate();
             return;
         }
+        // Increment the failure counter on the request.
+        tRequest.failures+=1;
         
         String logMsg = "Seed failed at " + tRequest.toString() + " after "
-                + (tRequest.failures+1) + " of " + (tileFailureRetryCount + 1)
+                + (tRequest.failures) + " of " + (tileFailureRetryCount)
                 + " attempts.";
         
         if (tRequest.failures < tileFailureRetryCount) {
-            // Try again
+            // Haven't reach limit so try again.
             tRequest.retryAt=System.currentTimeMillis()+tileFailureRetryWaitTime;
-            tRequest.failures+=1;
             retry.add(tRequest);
             log.trace("Waiting " + tileFailureRetryWaitTime
                     + " before trying again");

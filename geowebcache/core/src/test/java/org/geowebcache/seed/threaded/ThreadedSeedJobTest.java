@@ -88,6 +88,9 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         super.tearDown();
     }
     
+    // FIXME The following three tests need to be split over separate test cases for TileLayer, 
+    // TileRangeIterator, and SeedTask using Mocks.
+    
     /**
      * For a metatiled seed request over a given zoom level, make sure the correct wms calls are
      * issued
@@ -367,7 +370,79 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         
         trDone = job.getNextLocation();
         assertNull(trDone);
-        assertEquals(3, job.getFailures());
+        assertEquals(3, job.getFailures()); // 1 on first failed tile, 2 on second.
+        
+        verify(tri);
+    }
+    
+    /**
+     * Check that repeated failures kill the job.
+     * 
+     * Note, this test is depends on timing.  Using a debugger may alter its behaviour.
+     * 
+     * @throws Exception
+     */
+    public void testGetNextRequestWithMaxRetry() throws Exception {
+        TileRangeIterator tri = createMock(TileRangeIterator.class);
+        
+        expect(tri.nextMetaGridLocation()).andReturn(new long[] {1,2,3});
+        expect(tri.nextMetaGridLocation()).andReturn(new long[] {4,5,6});
+        expect(tri.nextMetaGridLocation()).andReturn(new long[] {7,8,9});
+        expect(tri.nextMetaGridLocation()).andReturn(null).anyTimes();
+        replay(tri);
+        
+        SeedJob job = (SeedJob) initNextLocation(tri);
+        
+        GWCTask task = job.getTasks()[0];
+
+        reset(task); {
+            expect(task.getJob()).andStubReturn(job);
+            task.terminateNicely();
+            expectLastCall().once();
+            expect(task.getState()).andStubReturn(STATE.RUNNING);
+        } replay(task);
+        
+        TileRequest tr;
+        
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {1,2,3});
+        assertEquals(0, tr.getFailures());
+        
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        Thread.sleep(1500); // Make sure we give it time to get through the queue.
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {1,2,3});
+        assertEquals(1, tr.getFailures());
+        
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        Thread.sleep(1500); // Make sure we give it time to get through the queue.
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {1,2,3});
+        assertEquals(2, tr.getFailures());
+        
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        Thread.sleep(1500); // Make sure we give it time to get through the queue.
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {4,5,6}); // Previous tile should have failed out.
+        assertEquals(0, tr.getFailures());
+        
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        Thread.sleep(1500); // Make sure we give it time to get through the queue.
+        
+        tr = job.getNextLocation();
+        assertTileRequestAt(tr, new long[] {4,5,6}); // Failed tile shouldn't have made it through yet so it should get a new one
+        assertEquals(1, tr.getFailures());
+        
+        // This should kill the task
+        job.failure(task, tr, new RuntimeException("Just a test"));
+        
+        job.threadStopped(task);
+        
+        verify(task);
     }
 
     /**
@@ -397,7 +472,7 @@ public class ThreadedSeedJobTest extends AbstractJobTest {
         replay(breeder);
         TileLayer tl = createMock(TileLayer.class);
         replay(tl);
-        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, false, tri, tl, 2,750,4, false);
+        ThreadedSeedJob job = new ThreadedSeedJob(1,1, breeder, false, tri, tl, 3,750,5, false);
 
         return job;
     }
