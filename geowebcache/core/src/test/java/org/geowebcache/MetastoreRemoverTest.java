@@ -3,13 +3,13 @@ package org.geowebcache;
 import java.io.File;
 import java.util.Iterator;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.io.FileUtils;
 import org.geowebcache.config.ConfigurationException;
 import org.geowebcache.storage.DefaultStorageFinder;
 import org.geowebcache.storage.MetastoreRemover;
 import org.geowebcache.util.ApplicationContextProvider;
-
-import junit.framework.TestCase;
 
 public class MetastoreRemoverTest extends TestCase {
     
@@ -36,10 +36,11 @@ public class MetastoreRemoverTest extends TestCase {
         testMigration(false);
     }
     
+    /*
     public void testMigrationWithDates() throws Exception {
         testMigration(true);
     }
-
+    */
 
     public void testMigration(boolean migrateCreationDates) throws Exception {
         System.setProperty("MIGRATE_CREATION_DATES", String.valueOf(migrateCreationDates));
