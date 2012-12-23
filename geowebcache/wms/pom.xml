@@ -8,7 +8,6 @@
     <artifactId>geowebcache</artifactId>
     <version>1.4-SNAPSHOT</version>
   </parent>
-  <groupId>org.geowebcache</groupId>
   <artifactId>gwc-wms</artifactId>
   <packaging>jar</packaging>
   <name>gwc-wms</name>
@@ -18,24 +17,21 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
-      <artifactId>servlet-api</artifactId>
+      <artifactId>javax.servlet-api</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-wms</artifactId>
-      <version>${gt.version}</version>
       <!-- optional>true</optional -->
     </dependency>
 
 	<dependency>
     	<groupId>commons-httpclient</groupId>
     	<artifactId>commons-httpclient</artifactId>
-    	<version>3.1</version>
     </dependency>
 
     <!-- test dependencies -->

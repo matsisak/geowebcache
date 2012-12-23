@@ -7,7 +7,6 @@
     <artifactId>geowebcache</artifactId>
     <version>1.4-SNAPSHOT</version>
   </parent>
-  <groupId>org.geowebcache</groupId>
   <artifactId>gwc-rest</artifactId>
   <packaging>jar</packaging>
   <name>gwc-rest</name>
@@ -17,11 +16,10 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
-      <artifactId>servlet-api</artifactId>
+      <artifactId>javax.servlet-api</artifactId>
     </dependency>
 
     <dependency>
@@ -85,7 +83,6 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
       <classifier>tests</classifier>
     </dependency>

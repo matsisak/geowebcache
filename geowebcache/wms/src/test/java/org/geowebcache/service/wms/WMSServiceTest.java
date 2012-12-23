@@ -1,7 +1,8 @@
 package org.geowebcache.service.wms;
 
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +16,6 @@ import javax.servlet.http.HttpServletResponse;
 import junit.framework.TestCase;
 
 import org.apache.commons.collections.map.CaseInsensitiveMap;
-import org.geowebcache.GeoWebCacheDispatcher;
 import org.geowebcache.config.XMLGridSubset;
 import org.geowebcache.conveyor.ConveyorTile;
 import org.geowebcache.grid.BoundingBox;
@@ -28,7 +28,6 @@ import org.geowebcache.layer.TileLayerDispatcher;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.stats.RuntimeStats;
 import org.geowebcache.storage.StorageBroker;
-import org.geowebcache.util.NullURLMangler;
 
 public class WMSServiceTest extends TestCase {
 
@@ -71,20 +70,17 @@ public class WMSServiceTest extends TestCase {
     private void testMultipleCrsMatchingGridSubsets(final String srs, final String expectedGridset,
             long[] tileIndex) throws Exception {
 
-        GeoWebCacheDispatcher gwcd = mock(GeoWebCacheDispatcher.class);
-        when(gwcd.getServletPrefix()).thenReturn(null);
-        
-        service = new WMSService(sb, tld, mock(RuntimeStats.class), new NullURLMangler(), gwcd);
+        service = new WMSService(sb, tld, mock(RuntimeStats.class));
 
         @SuppressWarnings("unchecked")
-        Map<String, String> kvp = new CaseInsensitiveMap();
-        kvp.put("format", "image/png");
-        kvp.put("srs", "EPSG:4326");
-        kvp.put("width", "256");
-        kvp.put("height", "256");
-        kvp.put("layers", "mockLayer");
-        kvp.put("tiled", "true");
-        kvp.put("request", "GetMap");
+        Map<String, String[]> kvp = new CaseInsensitiveMap();
+        kvp.put("format", new String[]{"image/png"});
+        kvp.put("srs", new String[]{"EPSG:4326"});
+        kvp.put("width", new String[]{"256"});
+        kvp.put("height", new String[]{"256"});
+        kvp.put("layers", new String[]{"mockLayer"});
+        kvp.put("tiled", new String[]{"true"});
+        kvp.put("request", new String[]{"GetMap"});
 
         List<String> gridSetNames = Arrays.asList("GlobalCRS84Pixel", "GlobalCRS84Scale",
                 "EPSG:4326");
@@ -93,7 +89,7 @@ public class WMSServiceTest extends TestCase {
         // make the request match a tile in the expected gridset
         BoundingBox bounds;
         bounds = tileLayer.getGridSubset(expectedGridset).boundsFromIndex(tileIndex);
-        kvp.put("bbox", bounds.toString());
+        kvp.put("bbox", new String[]{bounds.toString()});
 
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);

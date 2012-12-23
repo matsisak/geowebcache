@@ -8,7 +8,6 @@
     <artifactId>gwc-diskquota</artifactId>
     <version>1.4-SNAPSHOT</version>
   </parent>
-  <groupId>org.geowebcache</groupId>
   <artifactId>gwc-diskquota-jdbc</artifactId>
   <packaging>jar</packaging>
   <name>Disk Quota management module - JDBC backends</name>
@@ -18,7 +17,6 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-diskquota-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.sleepycat</groupId>
@@ -58,7 +56,6 @@
     <dependency>
       <groupId>org.geowebcache</groupId>
       <artifactId>gwc-core</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
       <classifier>tests</classifier>
     </dependency>
