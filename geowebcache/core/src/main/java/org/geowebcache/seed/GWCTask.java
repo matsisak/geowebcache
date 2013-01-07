@@ -87,19 +87,19 @@ public abstract class GWCTask {
      * the Job when it stops.
      */
     public final void doAction() throws GeoWebCacheException, InterruptedException {
-        Assert.state(this.state==STATE.READY, "Task can not be started as it is "+state+" rather than READY");
+        Assert.state(getState()==STATE.READY, "Task can not be started as it is "+state+" rather than READY");
         state=STATE.RUNNING;
-        parentJob.threadStarted(this);
+        getJob().threadStarted(this);
         try {
             doActionInternal();
         } finally {
             // If it's not DONE, it's DEAD at this point.
-            if(state!=STATE.DONE && state!=STATE.DEAD){
-                log.info("Task "+Long.toString(taskId)+"reached end but was still in state "+state+".  Setting to DEAD.");
+            if(getState()!=STATE.DONE && getState()!=STATE.DEAD){
+                log.info("Task "+Long.toString(taskId)+"reached end but was still in state "+getState()+".  Setting to DEAD.");
                 state=STATE.DEAD;
             }
             dispose();
-            parentJob.threadStopped(this);
+            getJob().threadStopped(this);
         }
     }
 

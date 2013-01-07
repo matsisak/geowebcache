@@ -1,5 +1,7 @@
 package org.geowebcache.seed.threaded;
 
+import org.easymock.Capture;
+import org.easymock.IAnswer;
 import org.easymock.classextension.EasyMock;
 import org.geowebcache.TestHelpers;
 import org.geowebcache.grid.GridSubset;
@@ -13,6 +15,7 @@ import org.geowebcache.seed.GWCTask.TYPE;
 import org.geowebcache.seed.Job;
 import org.geowebcache.seed.SeedRequest;
 import org.geowebcache.seed.TruncateJob;
+import org.geowebcache.seed.TruncateTask;
 import org.geowebcache.storage.StorageBroker;
 import org.geowebcache.storage.TileObject;
 import org.geowebcache.storage.TileRange;
@@ -24,17 +27,30 @@ import static org.geowebcache.TestHelpers.createRequest;
 
 public class ThreadedTruncateJobTest extends AbstractJobTest {
 
+private ThreadedTileBreeder makeMockBreeder(TruncateTask mockTask) {
+    final Capture<TruncateJob> jobCap = new Capture<TruncateJob>();
+    ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+    expect(breeder.createTruncateTask(capture(jobCap))).andReturn(mockTask);
+    expect(mockTask.getJob()).andStubAnswer(new IAnswer<Job>(){
+
+        public Job answer() throws Throwable {
+            return jobCap.getValue();
+        }});
+    return breeder;
+}
+
 @Override
 protected Job initNextLocation(TileRangeIterator tri) {
-    ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+    final TruncateTask task = createMock(TruncateTask.class);
+    final ThreadedTileBreeder breeder = makeMockBreeder(task);
+    replay(task);
     replay(breeder);
+    
     TileLayer tl = createMock(TileLayer.class);
     replay(tl);
+    
     ThreadedTruncateJob job = new ThreadedTruncateJob(1, breeder, tri, tl, false);
     
-    GWCTask task = createMock(GWCTask.class);
-    expect(task.getJob()).andReturn(job).anyTimes();
-    replay(task);
     job.threads[0] = task;
 
     return job;
@@ -42,22 +58,18 @@ protected Job initNextLocation(TileRangeIterator tri) {
 
 @Override
 protected Job jobWithTaskStates(STATE... states) {
-    ThreadedTileBreeder breeder = createMock(ThreadedTileBreeder.class);
+    final TruncateTask task = createMock(TruncateTask.class);
+    final ThreadedTileBreeder breeder = makeMockBreeder(task);
+    expect(task.getState()).andReturn(states[0]).anyTimes();
+    replay(task);
     replay(breeder);
+    
     TileLayer tl = createMock(TileLayer.class);
     replay(tl);
     TileRangeIterator tri = createMock(TileRangeIterator.class);
     replay(tri);
     
     ThreadedTruncateJob job = new ThreadedTruncateJob(1, breeder, tri, tl, false);
-    
-    // Replace the thread with mock.
-    GWCTask task = createMock(GWCTask.class);
-    expect(task.getState()).andReturn(states[0]).anyTimes();
-    expect(task.getJob()).andReturn(job).anyTimes();
-    replay(task);
-    job.threads[0] = task;
-
     
     return job;
 
@@ -95,7 +107,6 @@ public void testGetStateUnset() throws Exception {
  */
 public void testSeedStoredTiles() throws Exception {
 
-    ThreadedTileBreeder breeder;
     StorageBroker storageBroker;
     WMSLayer tl;
 
@@ -107,23 +118,24 @@ public void testSeedStoredTiles() throws Exception {
 
     final GridSubset gridSubset = tl.getGridSubset(gridSetId);
 
-    final long[] coveredGridLevels = gridSubset.getCoverage(zoomLevel);
-
     storageBroker = createMock(StorageBroker.class);
     
     TileRange tr = ThreadedTileBreeder.createTileRange(req, tl);
     TileRangeIterator trIter = new TileRangeIterator(tr, tl.getMetaTilingFactors());
+
     
-    // Delete should be called with the tile range once.
-    expect(storageBroker.delete(tr)).andReturn(true).once();
-    replay(storageBroker);
-    
-    breeder = createMock(ThreadedTileBreeder.class);
-    expect(breeder.getStorageBroker()).andStubReturn(storageBroker);
-    expect(breeder.createTruncateTask(EasyMock.<TruncateJob>anyObject()));
+    final TruncateTask task = createMock(TruncateTask.class);
+    final ThreadedTileBreeder breeder = makeMockBreeder(task);
+    expect(task.getState()).andStubReturn(STATE.READY);
+    expectDoActionInternal(task);
+    expectDispose(task);
+    replay(task);
     replay(breeder);
+    replay(storageBroker);
+  
 
     ThreadedTruncateJob job = new ThreadedTruncateJob(1,breeder, trIter, tl, false);
+    assertSame(job.getTasks()[0], task);
     
     job.runSynchronously();
 

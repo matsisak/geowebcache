@@ -17,11 +17,13 @@ package org.geowebcache.layer.wms;
 import static org.easymock.EasyMock.*;
 import static org.easymock.classextension.EasyMock.*;
 import static org.geowebcache.TestHelpers.*;
+import static org.geowebcache.util.TileObjectMatcher.tileObjectAt;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,7 @@ import org.geowebcache.grid.GridSetBroker;
 import org.geowebcache.grid.OutsideCoverageException;
 import org.geowebcache.io.ByteArrayResource;
 import org.geowebcache.io.Resource;
+import org.geowebcache.layer.MetaTile;
 import org.geowebcache.mime.MimeType;
 import org.geowebcache.seed.GWCTask;
 import org.geowebcache.seed.SeedRequest;
@@ -113,6 +116,56 @@ public class WMSLayerTest extends TestCase {
         assertTrue(value.getBlob().getSize() > 0);
 
         verify(mockStorageBroker);
+        
+        // check the lock provider was called in a symmetric way
+        lockProvider.verify();
+        lockProvider.clear();
+    }
+    
+    public void testSeedMetaTiledMulti() throws Exception {
+        final String format = "image/png";
+        WMSLayer layer = createWMSLayer(format);
+        layer.addMetaWidthHeight(2, 2);
+
+        WMSSourceHelper mockSourceHelper = new MockWMSSourceHelper();
+        
+        WMSSourceHelper instrumentedSourceHelper = createMock(WMSSourceHelper.class);
+        
+        Capture<WMSMetaTile> captured = new Capture<WMSMetaTile>();
+        instrumentedSourceHelper.makeRequest(capture(captured), EasyMock.<Resource>anyObject());
+        expectLastCall().andStubDelegateTo(mockSourceHelper);
+        instrumentedSourceHelper.setConcurrency(32);
+        instrumentedSourceHelper.setBackendTimeout(120);
+        replay(instrumentedSourceHelper);
+        
+        MockLockProvider lockProvider = new MockLockProvider();
+        layer.setSourceHelper(instrumentedSourceHelper);
+        layer.setLockProvider(lockProvider);
+
+        final StorageBroker mockStorageBroker = EasyMock.createMock(StorageBroker.class);
+        //(mockStorageBroker.put(tileObjectAt(0,0,2, format))).andReturn(true);
+        replay(mockStorageBroker);
+
+        String layerId = layer.getName();
+        HttpServletRequest servletReq = new MockHttpServletRequest();
+        HttpServletResponse servletResp = new MockHttpServletResponse();
+
+        long[] gridLoc = { 1, 1, 2 };// x, y, level
+        MimeType mimeType = layer.getMimeTypes().get(0);
+        GridSet gridSet = gridSetBroker.WORLD_EPSG4326;
+        String gridSetId = gridSet.getName();
+        ConveyorTile tile = new ConveyorTile(mockStorageBroker, layerId, gridSetId, gridLoc,
+                mimeType, null, servletReq, servletResp);
+
+        boolean tryCache = false;
+        layer.seedTile(tile, tryCache);
+
+
+        verify(mockStorageBroker);
+        verify(instrumentedSourceHelper);
+        
+        MetaTile mt = captured.getValue();
+        assertTrue(Arrays.equals(mt.getMetaGridPos(), new long[] {0,0,2}));
         
         // check the lock provider was called in a symmetric way
         lockProvider.verify();

@@ -4,6 +4,7 @@ import static org.easymock.classextension.EasyMock.*;
 
 import java.lang.Thread.State;
 
+import org.easymock.IExpectationSetters;
 import org.geowebcache.seed.GWCTask.STATE;
 import org.geowebcache.seed.Job;
 import org.geowebcache.storage.TileRangeIterator;
@@ -22,6 +23,27 @@ public AbstractJobTest() {
 
 public AbstractJobTest(String name) {
     super(name);
+}
+
+/**
+ * Expect doActionInternal to be called on a mock GWCTask.
+ * @param mockTask
+ * @return
+ * @throws Throwable
+ */
+protected  IExpectationSetters<Object> expectDoActionInternal(GWCTask mockTask) throws Exception {
+    mockTask.doActionInternal();
+    return expectLastCall();
+}
+/**
+ * Expect dispose to be called on a mock GWCTask.
+ * @param mockTask
+ * @return
+ * @throws Throwable
+ */
+protected  IExpectationSetters<Object> expectDispose(GWCTask mockTask) throws Exception {
+    mockTask.dispose();
+    return expectLastCall();
 }
 
 /**
