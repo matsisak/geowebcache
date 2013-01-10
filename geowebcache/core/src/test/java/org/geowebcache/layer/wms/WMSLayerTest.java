@@ -17,7 +17,6 @@ package org.geowebcache.layer.wms;
 import static org.easymock.EasyMock.*;
 import static org.easymock.classextension.EasyMock.*;
 import static org.geowebcache.TestHelpers.*;
-import static org.geowebcache.util.TileObjectMatcher.tileObjectAt;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
